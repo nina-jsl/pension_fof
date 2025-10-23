@@ -1,65 +1,157 @@
-import Image from "next/image";
+"use client";
+import { useState } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 export default function Home() {
+  const [age, setAge] = useState("");
+  const [salary, setSalary] = useState("");
+  const [results, setResults] = useState(null);
+
+  const handleCalculate = () => {
+    const currentAge = parseFloat(age);
+    const currentSalary = parseFloat(salary);
+    const retirementAge = 65;
+    const years = retirementAge - currentAge;
+
+    if (isNaN(currentAge) || isNaN(currentSalary) || years <= 0) {
+      alert("请输入合理的年龄和工资！");
+      return;
+    }
+
+    const salaryGrowth = 0.03; // 工资年增长率
+    const savingRate = 0.1; // 每年储蓄比例
+
+    // 各策略年化收益率
+    const strategies = [
+      { name: "不存钱", rate: 0 },
+      { name: "存定期", rate: 0.02 },
+      { name: "资产配置投资", rate: 0.06 },
+    ];
+
+    // 计算总资产
+    const calcTotal = (rate) => {
+      let total = 0;
+      let annualSalary = currentSalary;
+      for (let i = 0; i < years; i++) {
+        total += annualSalary * savingRate;
+        total *= 1 + rate;
+        annualSalary *= 1 + salaryGrowth;
+      }
+      return total;
+    };
+
+    // 计算结果数据
+    const data = strategies.map((s) => {
+      const total = calcTotal(s.rate);
+      const income = total / 20; // 假设退休后支取 20 年
+      const target = currentSalary * 0.7; // 理想退休收入
+      const percent = ((income / target) * 100).toFixed(1);
+
+      return {
+        策略: s.name,
+        退休总资产: Math.round(total),
+        每年收入: Math.round(income),
+        达成率: parseFloat(percent),
+      };
+    });
+
+    setResults(data);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="flex flex-col items-center justify-center p-8 space-y-6">
+      <h1 className="text-3xl font-bold mb-4">未来的我 – 退休储蓄模拟器</h1>
+
+      <div className="flex flex-col space-y-2 w-64">
+        <label>当前年龄：</label>
+        <input
+          type="number"
+          value={age}
+          onChange={(e) => setAge(e.target.value)}
+          className="border p-2 rounded"
+          placeholder="如 30"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+        <label>当前年薪 (¥)：</label>
+        <input
+          type="number"
+          value={salary}
+          onChange={(e) => setSalary(e.target.value)}
+          className="border p-2 rounded"
+          placeholder="如 100000"
+        />
+        <button
+          onClick={handleCalculate}
+          className="mt-4 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+        >
+          开始模拟
+        </button>
+      </div>
+
+      {results && (
+        <div className="mt-10 w-full max-w-3xl">
+          <h2 className="text-xl font-semibold mb-3 text-center">结果对比</h2>
+
+          {/* --- 数据表格 --- */}
+          <table className="w-full border border-gray-300 text-center mb-8">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="p-2 border">策略</th>
+                <th className="p-2 border">退休时总资产 (¥)</th>
+                <th className="p-2 border">每年可支配收入 (¥)</th>
+                <th className="p-2 border">达成目标 (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((r) => (
+                <tr key={r.策略}>
+                  <td className="border p-2">{r.策略}</td>
+                  <td className="border p-2">{r.退休总资产.toLocaleString()}</td>
+                  <td className="border p-2">{r.每年收入.toLocaleString()}</td>
+                  <td
+                    className={`border p-2 ${
+                      r.达成率 >= 70
+                        ? "text-green-600"
+                        : r.达成率 >= 40
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {r.达成率}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* --- 柱状图 --- */}
+          <h3 className="text-lg font-medium mb-2 text-center">资产对比图表</h3>
+          <div style={{ width: "100%", height: 300 }}>
+            <ResponsiveContainer>
+              <BarChart
+                data={results}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="策略" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="退休总资产" fill="#4F46E5" />
+                <Bar dataKey="每年收入" fill="#60A5FA" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      )}
+    </main>
   );
 }

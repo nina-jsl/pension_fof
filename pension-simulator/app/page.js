@@ -1,94 +1,222 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LineChart, Line, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+  ReferenceLine,
 } from "recharts";
+
+function computeIdealCurves(age, retirementAge, targetMonthlyExpense, rateFn) {
+  const start = parseInt(age);
+  const retire = parseInt(retirementAge);
+  const end = 85;
+
+  // 1) 倒推出退休所需余额
+  let futureNeed = 0;
+  for (let y = end - retire - 1; y >= 0; y--) {
+    const r = rateFn(retire + y);
+    futureNeed = (futureNeed + targetMonthlyExpense * 12) / (1 + r);
+  }
+  const requiredAtRetirement = futureNeed;
+
+  // 2) 退休前：倒推“理想储蓄线”（对齐到每个“年末”点）
+  const idealSavings = [];
+  let val = requiredAtRetirement;
+ for (let y = retire - 1; y >= start + 1; y--) {
+    const r = rateFn(y);
+    val = val / (1 + r);           // 回滚一年，得到“该年末”需要的余额
+    idealSavings.unshift({ age: y, value: val });
+  }
+
+  // 3) 退休后：理想余额线（保持不变）
+  const idealBalances = [];
+  let bal = requiredAtRetirement;
+  for (let y = retire; y <= end; y++) {
+    const r = rateFn(y);
+    bal = bal * (1 + r) - targetMonthlyExpense * 12;
+    idealBalances.push({ age: y, value: Math.max(bal, 0) });
+  }
+
+  return { idealSavings, idealBalances, requiredAtRetirement };
+}
+
 
 export default function Home() {
   const [step, setStep] = useState(1);
   const [age, setAge] = useState("");
-  const [salary, setSalary] = useState("");
+  const [retirementAge, setRetirementAge] = useState("65");
+  const [initIncome, setInitIncome] = useState("");
+  const [incomeGrowth, setIncomeGrowth] = useState("3");
   const [saveRate, setSaveRate] = useState("");
+  const [inflation, setInflation] = useState("2.5");
+  const [expenseRate, setExpenseRate] = useState("70");
   const [results, setResults] = useState(null);
   const [chosen, setChosen] = useState(null);
 
-  const COLORS = ["#9CA3AF", "#E5E7EB"]; // neutral gray tones
+  const LINE_COLORS = {
+    "定存/储蓄": "#9CA3AF",
+    全部股票: "#6B7280",
+    全部债券: "#A3A3A3",
+    养老FOF: "#4B5563",
+  };
 
-  // ---------- calculation ----------
-  const calcResults = (age, salary, saveRateInput) => {
-    const currentAge = parseFloat(age);
-    const currentSalary = parseFloat(salary);
-    const retirementAge = 65;
-    const years = retirementAge - currentAge;
-    const salaryGrowth = 0.03;
-    const saveRatio = parseFloat(saveRateInput) / 100;
+  // ---------- Simulation ----------
+  const simulateStrategyMonthly = ({
+    age,
+    retirementAge,
+    initMonthlyIncome,
+    incomeGrowthAnnual,
+    saveRate,
+    inflationAnnual,
+    rateAnnualFn,
+    crisisMonthIndex,
+  }) => {
+    const months = Math.max(0, (retirementAge - age) * 12);
+    const g_m = Math.pow(1 + incomeGrowthAnnual, 1 / 12) - 1;
+    const inf_m = Math.pow(1 + inflationAnnual, 1 / 12) - 1;
+
+    let balance = 0;
+    let monthlyIncome = initMonthlyIncome;
+    let inflationIndex = 1;
+    const series = [];
+
+    for (let m = 0; m < months; m++) {
+      const monthlySaving = monthlyIncome * saveRate;
+      balance += monthlySaving;
+      const r_annual = rateAnnualFn(m, months, age + m / 12);
+      const r_m = Math.pow(1 + r_annual, 1 / 12) - 1;
+      balance *= 1 + r_m;
+      inflationIndex *= 1 + inf_m;
+
+      if ((m + 1) % 12 === 0) {
+        const currentAge = age + (m + 1) / 12;
+        const nominal = balance;
+        const real = balance / inflationIndex;
+        const monthlyRetIncome = nominal / (20 * 12);
+        series.push({
+          yearLabel: `${Math.round(currentAge)}岁`,
+          yearNum: Math.round(currentAge),
+          nominal,
+          real,
+          monthlyRetIncome,
+        });
+      }
+      monthlyIncome *= 1 + g_m;
+    }
+
+    const finalNominal = balance;
+    const monthlyRetirementIncomeNominal = finalNominal / (20 * 12);
+    const lastMonthIncome = monthlyIncome / (1 + g_m);
+    const targetMonthlyExpense = lastMonthIncome * (parseFloat(expenseRate) / 100);
+
+    const retireTo85Months = Math.max(0, (85 - retirementAge) * 12);
+    const decumulationSeries = [];
+    let bal = finalNominal;
+    for (let m = 0; m < retireTo85Months; m++) {
+      const r_annual = rateAnnualFn(months + m, months + retireTo85Months, retirementAge + m / 12);
+      const r_m = Math.pow(1 + r_annual, 1 / 12) - 1;
+      bal *= 1 + r_m;
+      bal -= monthlyRetirementIncomeNominal;
+      if ((m + 1) % 12 === 0) {
+        const currentAge = retirementAge + (m + 1) / 12;
+        decumulationSeries.push({
+          yearLabel: `${Math.round(currentAge)}岁`,
+          yearNum: Math.round(currentAge),
+          balance: Math.max(bal, 0),
+        });
+      }
+      if (bal <= 0) break;
+    }
+
+    const percent = Math.max(0, Math.min(999, (monthlyRetirementIncomeNominal / targetMonthlyExpense) * 100));
+
+    return {
+      series,
+      decumulationSeries,
+      finalNominal,
+      monthlyRetirementIncomeNominal,
+      targetMonthlyExpense,
+      percent: Number(percent.toFixed(1)),
+    };
+  };
+
+  const makeSimulations = () => {
+    const a = parseFloat(age);
+    const ra = parseFloat(retirementAge);
+    const inc0 = parseFloat(initIncome);
+    const g = parseFloat(incomeGrowth) / 100;
+    const s = parseFloat(saveRate) / 100;
+    const inf = parseFloat(inflation) / 100;
+    if ([a, ra, inc0, g, s, inf].some((x) => Number.isNaN(x))) return null;
+    if (ra <= a) return null;
+
+    const months = (ra - a) * 12;
+    const crisisMonthIndex = Math.max(1, Math.floor(months * 0.65));
 
     const strategies = [
-      { name: "不存钱", baseRate: 0 },
-      { name: "存定期", baseRate: 0.015 },
-      { name: "资产配置投资", baseRate: 0.07 },
+      { name: "定存/储蓄", rateAnnualFn: () => 0.018 },
+      {
+        name: "全部股票",
+        rateAnnualFn: (m) => (m === crisisMonthIndex ? (1 - 0.3) ** 12 - 1 : 0.07),
+      },
+      { name: "全部债券", rateAnnualFn: () => 0.03 },
+      {
+        name: "养老FOF",
+        rateAnnualFn: (m, total) => {
+          const start = 0.06,
+            end = 0.03;
+          return start + (end - start) * (m / Math.max(1, total - 1));
+        },
+      },
     ];
 
-    const calcTotal = (baseRate, isAllocation = false, isNoSave = false) => {
-      let total = 0;
-      let s = currentSalary;
-      for (let i = 0; i < years; i++) {
-        if (!isNoSave) total += s * saveRatio;
-        const rate = isAllocation ? baseRate - (i / years) * 0.04 : baseRate;
-        total *= 1 + rate;
-        s *= 1 + salaryGrowth;
-      }
-      return total;
-    };
-
-    return strategies.map((s) => {
-      const total = calcTotal(
-        s.baseRate,
-        s.name === "资产配置投资",
-        s.name === "不存钱"
-      );
-      const income = total / 20;
-      const target = currentSalary * 0.7;
-      const percent = ((income / target) * 100).toFixed(1);
-      return {
-        策略: s.name,
-        退休总资产: Math.round(total),
-        每年收入: Math.round(income),
-        达成率: parseFloat(percent),
-      };
-    });
+    return strategies.map((st) => ({
+      name: st.name,
+      ...simulateStrategyMonthly({
+        age: a,
+        retirementAge: ra,
+        initMonthlyIncome: inc0,
+        incomeGrowthAnnual: g,
+        saveRate: s,
+        inflationAnnual: inf,
+        rateAnnualFn: st.rateAnnualFn,
+        crisisMonthIndex,
+      }),
+    }));
   };
 
   const handleNext = () => {
-    if (!age || !salary || !saveRate) {
-      alert("请输入年龄、工资和计划储蓄比例！");
+    const res = makeSimulations();
+    if (!res) {
+      alert("请完整填写所有输入项");
       return;
     }
-    const res = calcResults(age, salary, saveRate);
     setResults(res);
     setStep(2);
   };
-
-  const handleChoice = (choice) => {
-    setChosen(choice);
+  const handleChoice = (c) => {
+    setChosen(c);
     setStep(3);
   };
-
   const handleCompare = () => setStep(4);
-  const handleLifestyle = () => setStep(5);
+
+  const sims = useMemo(() => results || [], [results]);
+  const selectedSim = useMemo(() => sims.find((x) => x.name === chosen), [sims, chosen]);
 
   // ---------- UI ----------
   return (
     <main className="flex flex-col items-center justify-center p-8 space-y-6 min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <h1 className="text-3xl font-bold mb-4 text-gray-800">
-        退休储蓄模拟器
-      </h1>
+      <h1 className="text-3xl font-bold mb-4 text-gray-800">退休储蓄模拟器</h1>
 
       <AnimatePresence mode="wait">
-        {/* STEP 1 – 输入资料 */}
+        {/* STEP 1 */}
         {step === 1 && (
           <motion.div
             key="step1"
@@ -96,252 +224,215 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.5 }}
-            className="flex flex-col space-y-3 w-80 bg-white p-6 rounded-xl shadow-md"
+            className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-3xl bg-white p-6 rounded-xl shadow-md"
           >
-            <label>当前年龄：</label>
-            <input
-              type="number"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
-              className="border p-2 rounded"
-              placeholder="如 30"
-            />
-            <label>当前年薪 (¥)：</label>
-            <input
-              type="number"
-              value={salary}
-              onChange={(e) => setSalary(e.target.value)}
-              className="border p-2 rounded"
-              placeholder="如 100000"
-            />
-            <label>计划储蓄比例 (%):</label>
-            <input
-              type="number"
-              value={saveRate}
-              onChange={(e) => setSaveRate(e.target.value)}
-              className="border p-2 rounded"
-              placeholder="如 10"
-            />
-            {saveRate && salary && (
-              <p className="text-sm text-gray-500">
-                每年储蓄约 ¥{((salary * saveRate) / 100).toLocaleString()}
-              </p>
-            )}
-            <button
-              onClick={handleNext}
-              className="mt-4 bg-gray-700 text-white py-2 px-4 rounded hover:bg-gray-800"
-            >
-              下一步 →
-            </button>
+            <Input label="当前年龄" value={age} setValue={setAge} placeholder="如 30" />
+            <Input label="计划退休年龄" value={retirementAge} setValue={setRetirementAge} placeholder="如 65" />
+            <Input label="当前月薪 (¥)" value={initIncome} setValue={setInitIncome} placeholder="如 10000" />
+            <Input label="工资年增速 (%)" value={incomeGrowth} setValue={setIncomeGrowth} placeholder="如 3" />
+            <Input label="储蓄比例 (% of 月薪)" value={saveRate} setValue={setSaveRate} placeholder="如 10" />
+            <Input label="年通胀率 (%)" value={inflation} setValue={setInflation} placeholder="如 2.5" />
+            <div className="md:col-span-2">
+              <button onClick={handleNext} className="mt-2 bg-gray-700 text-white py-2 px-4 rounded hover:bg-gray-800">
+                下一步 →
+              </button>
+            </div>
           </motion.div>
         )}
 
-        {/* STEP 2 – 选择策略 */}
-        {step === 2 && (
+        {/* STEP 2 */}
+        {step === 2 && results && (
           <motion.div
             key="step2"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.4 }}
             className="flex flex-col items-center space-y-4"
           >
-            <h2 className="text-xl font-semibold text-gray-800">
-              请选择储蓄方式
-            </h2>
-            <div className="flex space-x-4">
-              <button
-                onClick={() => handleChoice("不存钱")}
-                className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
-              >
-                不存钱
-              </button>
-              <button
-                onClick={() => handleChoice("存定期")}
-                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-              >
-                存定期
-              </button>
-              <button
-                onClick={() => handleChoice("资产配置投资")}
-                className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
-              >
-                投资配置
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* STEP 3 – 单项结果 */}
-        {step === 3 && results && (
-          <motion.div
-            key="step3"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -30 }}
-            transition={{ duration: 0.5 }}
-            className="text-center space-y-6 bg-white p-6 rounded-2xl shadow-md w-96"
-          >
-            {results
-              .filter((r) => r.策略 === chosen)
-              .map((r) => (
-                <div key={r.策略}>
-                  <h2 className="text-2xl font-bold text-gray-700 mb-2">
-                    {r.策略}
-                  </h2>
-                  <PieChart width={220} height={200} className="mx-auto">
-                    <Pie
-                      dataKey="value"
-                      data={[
-                        { name: "已达成", value: r.达成率 },
-                        { name: "差距", value: 100 - r.达成率 },
-                      ]}
-                      innerRadius={60}
-                      outerRadius={80}
-                      startAngle={90}
-                      endAngle={450}
-                      paddingAngle={2}
-                    >
-                      {[
-                        { value: r.达成率 },
-                        { value: 100 - r.达成率 },
-                      ].map((entry, index) => (
-                        <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                  <p className="text-gray-700">
-                    退休总资产：¥{r.退休总资产.toLocaleString()}
-                  </p>
-                  <p className="text-gray-700">
-                    每年预计收入：¥{r.每年收入.toLocaleString()}
-                  </p>
-                  <p className="text-gray-700">目标达成比例：{r.达成率}%</p>
-                </div>
+            <h2 className="text-xl font-semibold text-gray-800">请选择想要投资的方式</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {["定存/储蓄", "全部股票", "全部债券", "养老FOF"].map((label) => (
+                <button
+                  key={label}
+                  onClick={() => handleChoice(label)}
+                  className="bg-gray-600 text-white px-5 py-2 rounded hover:bg-gray-700"
+                >
+                  {label}
+                </button>
               ))}
-            <div className="bg-gray-50 border rounded-lg p-3 text-sm text-gray-600">
-              💡 养老FOF 会根据年龄逐步降低风险，让收益更平稳。
             </div>
-            <button
-              onClick={handleCompare}
-              className="mt-4 bg-gray-700 text-white py-2 px-4 rounded hover:bg-gray-800"
-            >
-              查看对比图表 📊
-            </button>
           </motion.div>
         )}
 
-        {/* STEP 4 – 对比结果 */}
+        {/* STEP 3: 用户选择的策略 */}
+        {selectedSim && step === 3 && (
+          <div className="w-full max-w-3xl mt-6 space-y-6">
+            <h3 className="text-lg font-semibold text-gray-700 text-center">财富积累阶段（实际储蓄 vs 理想储蓄线）</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart
+                data={(() => {
+                  const ideal = computeIdealCurves(age, retirementAge, selectedSim.targetMonthlyExpense, () => 0.04);
+                  const data = {};
+                  selectedSim.series.forEach((pt) => {
+                    data[pt.yearNum] = { year: `${pt.yearNum}岁`, 实际储蓄: pt.nominal };
+                  });
+                  ideal.idealSavings.forEach((pt) => {
+                    if (!data[pt.age]) data[pt.age] = { year: `${pt.age}岁` };
+                    data[pt.age]["理想储蓄线"] = pt.value;
+                  });
+                  return Object.values(data).sort((a, b) => parseInt(a.year) - parseInt(b.year));
+                })()}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="year" />
+                <YAxis tickFormatter={(v) => (v >= 1e6 ? `¥${Math.round(v / 1e6)}M` : `¥${Math.round(v / 1e3)}K`)} />
+                <Tooltip formatter={(v) => `¥${Math.round(v).toLocaleString()}`} />
+                <Legend />
+                <Line type="linear" dataKey="理想储蓄线" stroke="#D1D5DB" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                <Line type="linear" dataKey="实际储蓄" stroke="#4B5563" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+
+            <h3 className="text-lg font-semibold text-gray-700 text-center">退休支出阶段（账户余额 vs 理想余额线）</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart
+                data={(() => {
+                  const ideal = computeIdealCurves(age, retirementAge, selectedSim.targetMonthlyExpense, () => 0.03);
+                  const data = {};
+                  ideal.idealBalances.forEach((pt) => {
+                    data[pt.age] = { year: `${pt.age}岁`, 理想余额线: pt.value };
+                  });
+                  let balance = selectedSim.finalNominal;
+                  for (let y = parseInt(retirementAge); y <= 85; y++) {
+                    balance = balance * 1.03 - selectedSim.monthlyRetirementIncomeNominal;
+                    data[y] = { ...data[y], 实际余额: Math.max(balance, 0), year: `${y}岁` };
+                  }
+                  return Object.values(data).sort((a, b) => parseInt(a.year) - parseInt(b.year));
+                })()}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="year" />
+                <YAxis tickFormatter={(v) => (v >= 1e6 ? `¥${Math.round(v / 1e6)}M` : `¥${Math.round(v / 1e3)}K`)} />
+                <Tooltip formatter={(v) => `¥${Math.round(v).toLocaleString()}`} />
+                <Legend />
+                <Line type="linear" dataKey="理想余额线" stroke="#D1D5DB" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                <Line type="linear" dataKey="实际余额" stroke="#4B5563" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+
+            <button onClick={handleCompare} className="bg-gray-700 text-white py-2 px-4 rounded hover:bg-gray-800 mx-auto block">
+              查看所有策略对比 →
+            </button>
+          </div>
+        )}
+
+        {/* STEP 4: 所有策略对比 */}
         {step === 4 && results && (
           <motion.div
             key="step4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
             transition={{ duration: 0.6 }}
-            className="mt-8 w-full max-w-3xl space-y-6 bg-white p-6 rounded-2xl shadow-md"
+            className="mt-8 w-full max-w-5xl space-y-8 bg-white p-6 rounded-2xl shadow-md"
           >
-            <h2 className="text-2xl font-semibold text-center text-gray-800">
-              策略对比结果
-            </h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={results}>
+            <h2 className="text-2xl font-semibold text-gray-800 text-center mb-4">策略对比：财富积累阶段 与 退休支出阶段</h2>
+
+            {/* 财富积累阶段 */}
+            <ResponsiveContainer width="100%" height={360}>
+              <LineChart
+                data={(() => {
+                  const a = parseFloat(age);
+                  const ra = parseFloat(retirementAge);
+                  const targetExpense = results[0].targetMonthlyExpense;
+                  const ideal = computeIdealCurves(a, ra, targetExpense, () => 0.04);
+                  const byYear = {};
+
+                  results.forEach((s) => {
+                    s.series.forEach((pt) => {
+                      if (!byYear[pt.yearNum]) byYear[pt.yearNum] = { year: `${pt.yearNum}岁` };
+                      byYear[pt.yearNum][s.name] = pt.nominal;
+                    });
+                  });
+
+                  ideal.idealSavings.forEach((pt) => {
+                    if (!byYear[pt.age]) byYear[pt.age] = { year: `${pt.age}岁` };
+                    byYear[pt.age]["理想储蓄线"] = pt.value;
+                  });
+
+                  return Object.values(byYear).sort((a, b) => parseInt(a.year) - parseInt(b.year));
+                })()}
+              >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="策略" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="退休总资产" stroke="#9CA3AF" strokeWidth={2} />
+                <XAxis dataKey="year" />
+                <YAxis tickFormatter={(v) => (v >= 1e6 ? `¥${Math.round(v / 1e6)}M` : `¥${Math.round(v / 1e3)}K`)} />
+                <Tooltip formatter={(v) => `¥${Math.round(v).toLocaleString()}`} />
+                <Legend />
+                {Object.keys(LINE_COLORS).map((k) => (
+                  <Line key={k} type="linear" dataKey={k} stroke={LINE_COLORS[k]} strokeWidth={2} dot={false} isAnimationActive={false} />
+                ))}
+                <Line type="linear" dataKey="理想储蓄线" stroke="#D1D5DB" strokeDasharray="5 5" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
-            <div className="bg-gray-50 border rounded-lg p-3 text-sm text-gray-600">
-              📘 养老FOF通过分散资产配置，在波动中保持稳健增长。
-              定期存款虽然安全，但难以抵御通胀；
-              “投资配置”方案更接近长期理财的目标平衡。
-            </div>
-            <button
-              onClick={handleLifestyle}
-              className="bg-gray-700 text-white py-2 px-4 rounded hover:bg-gray-800"
-            >
-              查看未来生活预览 →
-            </button>
-          </motion.div>
-        )}
 
-        {/* STEP 5 – 未来生活预览 */}
-        {step === 5 && (
-          <motion.div
-            key="step5"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
-            className="flex flex-col items-center bg-white p-8 rounded-xl shadow-md w-full max-w-4xl space-y-8"
-          >
-            <h2 className="text-2xl font-semibold text-gray-800">
-              未来生活预览
-            </h2>
-            <p className="text-gray-600 text-sm text-center max-w-md">
-              不同储蓄方式会在未来形成不同的生活节奏。
-              以下是三个可能的场景，并非“好或坏”，而是不同选择的自然结果。
-            </p>
+            {/* 退休支出阶段 */}
+            <ResponsiveContainer width="100%" height={360}>
+              <LineChart
+                data={(() => {
+                  const a = parseFloat(age);
+                  const ra = parseFloat(retirementAge);
+                  const targetExpense = results[0].targetMonthlyExpense;
+                  const ideal = computeIdealCurves(a, ra, targetExpense, () => 0.03);
+                  const byYear = {};
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-              <div className="flex flex-col items-center bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <div className="text-5xl mb-3">🏙️</div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">不存钱</h3>
-                <p className="text-sm text-gray-600 text-center leading-relaxed">
-                  预算较紧，需要继续工作几年以维持生活。<br />
-                  对市场波动较敏感，生活节奏受外部经济影响更大。
-                </p>
-              </div>
+                  ideal.idealBalances.forEach((pt) => {
+                    byYear[pt.age] = { year: `${pt.age}岁`, 理想余额线: pt.value };
+                  });
 
-              <div className="flex flex-col items-center bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <div className="text-5xl mb-3">🏡</div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">存定期</h3>
-                <p className="text-sm text-gray-600 text-center leading-relaxed">
-                  生活稳定但增长有限。<br />
-                  在应对通胀时可能需调整消费计划。
-                </p>
-              </div>
+                  results.forEach((s) => {
+                    let balance = s.finalNominal;
+                    for (let y = parseInt(retirementAge); y <= 85; y++) {
+                      balance = balance * 1.03 - s.monthlyRetirementIncomeNominal;
+                      if (!byYear[y]) byYear[y] = { year: `${y}岁` };
+                      byYear[y][s.name] = Math.max(balance, 0);
+                    }
+                  });
 
-              <div className="flex flex-col items-center bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <div className="text-5xl mb-3">🧘</div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">资产配置投资</h3>
-                <p className="text-sm text-gray-600 text-center leading-relaxed">
-                  收益更平稳，能更接近理想生活水平。<br />
-                  投资随年龄自动调整风险，长期保持平衡。
-                </p>
-              </div>
-            </div>
-
-            <div className="text-center mt-6 space-y-3">
-              <p className="text-gray-700 text-sm">
-                💡 养老FOF的理念是让财富曲线随人生节奏自然演进，
-                在风险与安心之间找到平衡。
-              </p>
-              <p className="text-gray-500 text-sm">
-                想了解我们的养老FOF产品详情？请访问
-                <a
-                  href="https://example.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline text-gray-700 hover:text-gray-900 ml-1"
-                >
-                  官方产品页面
-                </a>
-              </p>
-              <button
-                onClick={() => setStep(1)}
-                className="bg-gray-700 text-white py-2 px-6 rounded hover:bg-gray-800"
+                  return Object.values(byYear).sort((a, b) => parseInt(a.year) - parseInt(b.year));
+                })()}
               >
-                重新开始
-              </button>
-            </div>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="year" />
+                <YAxis tickFormatter={(v) => (v >= 1e6 ? `¥${Math.round(v / 1e6)}M` : `¥${Math.round(v / 1e3)}K`)} />
+                <Tooltip formatter={(v) => `¥${Math.round(v).toLocaleString()}`} />
+                <Legend />
+                {Object.keys(LINE_COLORS).map((k) => (
+                  <Line key={k} type="linear" dataKey={k} stroke={LINE_COLORS[k]} strokeWidth={2} dot={false} isAnimationActive={false} />
+                ))}
+                <Line type="linear" dataKey="理想余额线" stroke="#D1D5DB" strokeDasharray="5 5" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+
+            <button onClick={() => setStep(1)} className="bg-gray-700 text-white py-2 px-4 rounded hover:bg-gray-800 mx-auto block">
+              重新开始模拟 →
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
     </main>
+  );
+}
+
+function Input({ label, value, setValue, placeholder }) {
+  return (
+    <div className="flex flex-col space-y-2">
+      <label>{label}</label>
+      <input
+        className="border p-2 rounded"
+        type="number"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={placeholder}
+      />
+    </div>
   );
 }

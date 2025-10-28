@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  Area,
 } from "recharts";
 
 /* ======== Ideal JPM Benchmark (multiples of annual income) ======== */
@@ -91,10 +92,16 @@ export default function Home() {
       balance =
         balance * (1 + rateAnnualFn(y, years, currentAge)) + annualSaving;
 
+      const vol = 0.2885;
+      const upper = balance * (1 + vol / 2); // +1σ
+      const lower = balance * (1 - vol / 2); // -1σ
+
       series.push({
         yearLabel: `${currentAge}岁`,
         yearNum: currentAge,
         actual: balance,
+        shadowUp: upper,
+        shadowDown: lower,
       });
     }
 
@@ -116,21 +123,8 @@ export default function Home() {
       { name: "定存", rateAnnualFn: () => 0.018 },
       {
         name: "全部股票",
-        rateAnnualFn: (y) => {
-          // --- Base cyclical pattern using a sine wave (approx. 10-year cycle)
-          const cycle = Math.sin((2 * Math.PI * y) / 10); // smooth boom-bust curve
-          let baseReturn = 0.06 + 0.04 * cycle; // 2%–10% around a 6% trend
-
-          // --- Introduce smaller random fluctuations each year
-          const randomNoise = (Math.random() - 0.5) * 0.05; // ±2.5%
-
-          // --- Major crashes at certain intervals (stylized market crises)
-          const crashYears = [8, 19, 28, 38]; // e.g. 2008, 2018, 2020 analogs
-          if (crashYears.includes(y)) baseReturn = -0.25; // -25% drawdown
-
-          // Combine all effects
-          return baseReturn + randomNoise;
-        },
+        rateAnnualFn: (y) => 0.078, // steady 7.8% compound return
+        withShadow: true, // mark for visualization
       },
 
       { name: "全部债券", rateAnnualFn: () => 0.03 },
@@ -278,6 +272,8 @@ export default function Home() {
                     data[pt.yearNum] = {
                       year: `${pt.yearNum}岁`,
                       实际累计: pt.actual,
+                      shadowUp: pt.shadowUp,
+                      shadowDown: pt.shadowDown,
                     };
                   });
 
@@ -287,7 +283,7 @@ export default function Home() {
                   });
 
                   return Object.values(data).sort(
-                    (a, b) => parseInt(a.year, 10) - parseInt(b.year, 10)
+                    (a, b) => parseInt(a.year) - parseInt(b.year)
                   );
                 })()}
               >
@@ -298,11 +294,63 @@ export default function Home() {
                   tickFormatter={(v) => `¥${Math.round(Number(v) / 1000)}K`}
                 />
                 <Tooltip
-                  formatter={(v) =>
-                    `¥${Math.round(Number(v)).toLocaleString()}`
-                  }
+                  formatter={(value, name) => {
+                    if (name === "shadowUp" || name === "shadowDown")
+                      return null; // hide
+                    return [
+                      `¥${Math.round(Number(value)).toLocaleString()}`,
+                      name,
+                    ];
+                  }}
+                  labelFormatter={(label) => `${label}`}
+                  contentStyle={{
+                    backgroundColor: "#FFFFFF",
+                    border: "1px solid #E5E7EB",
+                    borderRadius: "8px",
+                  }}
                 />
+
                 <Legend />
+
+                {/* Shadow band area (surrounds the blue line) */}
+                {chosen === "全部股票" && (
+                  <>
+                    <defs>
+                      <linearGradient
+                        id="shadowGradient"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="0%"
+                          stopColor="#0071BB"
+                          stopOpacity={0.25}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor="#0071BB"
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+
+                    <Area
+                      type="monotone"
+                      dataKey="shadowUp"
+                      stroke="none"
+                      fill="url(#shadowGradient)"
+                      fillOpacity={0.25}
+                      isAnimationActive={false}
+                      baseLine={(d) => d.shadowDown}
+                      activeDot={false}
+                      legendType="none"
+                      name={null}
+                    />
+                  </>
+                )}
+
                 <Line
                   type="linear"
                   dataKey="理想累计线"
@@ -379,15 +427,21 @@ export default function Home() {
                   tickFormatter={(v) => `¥${Math.round(Number(v) / 1000)}K`}
                 />
                 <Tooltip
+                  formatter={(value, name) => {
+                    if (name === "shadowUp" || name === "shadowDown")
+                      return null;
+                    return [
+                      `¥${Math.round(Number(value)).toLocaleString()}`,
+                      name,
+                    ];
+                  }}
                   contentStyle={{
                     backgroundColor: "#FFFFFF",
                     border: "1px solid #E5E7EB",
                     borderRadius: "8px",
                   }}
-                  formatter={(v) =>
-                    `¥${Math.round(Number(v)).toLocaleString()}`
-                  }
                 />
+
                 <Legend
                   wrapperStyle={{
                     color: "#374151",

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import OrganicBlob from "./components/OrganicBlob";
 
 /* ===== City 社平工资 (annual -> monthly) ===== */
 const SOCIAL_AVG_WAGE = {
@@ -15,7 +16,7 @@ function interpret_pillar2_level(level) {
     none: 0.0,
     basic: 0.03,
     standard: 0.06,
-    generous: 0.10,
+    generous: 0.1,
   }[level];
 }
 
@@ -80,7 +81,8 @@ function pillar2_annuity(
   for (let t = 0; t < years_contributed; t++) {
     const base_t = base_start * Math.pow(1 + wage_growth, t);
     const contrib = base_t * rate * 12;
-    balance += contrib * Math.pow(1 + investment_return_real, years_contributed - t - 1);
+    balance +=
+      contrib * Math.pow(1 + investment_return_real, years_contributed - t - 1);
   }
 
   const divisor = { 60: 101, 55: 127, 50: 139 }[retirement_age];
@@ -95,13 +97,14 @@ function pillar3_required(
   pillar1_monthly,
   pillar2_monthly
 ) {
-  const target_ratio = 0.70;
+  const target_ratio = 0.7;
   const wage_growth = 0.025;
   const invest_return_real = 0.015;
   const retire_years = 20;
 
   const years_to_retire = retirement_age - age_now;
-  const final_wage = monthly_wage_now * Math.pow(1 + wage_growth, years_to_retire);
+  const final_wage =
+    monthly_wage_now * Math.pow(1 + wage_growth, years_to_retire);
   const target_income = final_wage * target_ratio;
 
   const gap = target_income - (pillar1_monthly + pillar2_monthly);
@@ -133,65 +136,111 @@ export default function Home() {
       yc = +yearsContributed;
 
     if ([a, ra, wage, yc].some(isNaN)) return alert("请填写完整信息");
-    if (yc < 0 || yc > (ra - a)) return alert("工作年限不合理");
+    if (yc < 0 || yc > ra - a) return alert("工作年限不合理");
 
     const socialAvg = SOCIAL_AVG_WAGE[city];
 
     const p1 = pillar1_pension(wage, socialAvg, yc, ra);
-    const p2 = pillar2_annuity(wage, socialAvg, yc, pillar2Level, 0.025, 0.03, ra);
+    const p2 = pillar2_annuity(
+      wage,
+      socialAvg,
+      yc,
+      pillar2Level,
+      0.025,
+      0.03,
+      ra
+    );
     const p3 = pillar3_required(wage, a, ra, p1, p2);
 
     setResult({ p1, p2, ...p3 });
   };
 
   return (
-    <main className="max-w-xl mx-auto p-8 space-y-6">
-      <h1 className="text-3xl font-bold text-center">退休收入测算</h1>
+    <>
+      <OrganicBlob /> 
+      {/* <CustomCursor /> */}
+      <main className="max-w-xl mx-auto p-8 space-y-6">
+        <div className="fixed inset-0 -z-10 pointer-events-none animate-[blob_18s_ease-in-out_infinite] opacity-40 bg-[radial-gradient(circle,_#F4F1E7_0%,_transparent_70%)]" />
 
-      <div className="grid gap-4">
-        <Input label="当前年龄" value={age} setValue={setAge} />
-        <Input label="计划退休年龄" value={retirementAge} setValue={setRetirementAge} />
-        <Input label="当前月薪 (¥)" value={monthlyWage} setValue={setMonthlyWage} />
+        <h1 className="text-3xl font-bold text-center">退休收入测算</h1>
 
-        <Input
-          label="已累计缴费年限（工作年限）"
-          value={yearsContributed}
-          setValue={setYearsContributed}
-          placeholder="如 3, 8, 12"
-        />
+        <div className="grid gap-4">
+          <Input label="当前年龄" value={age} setValue={setAge} />
+          <Input
+            label="计划退休年龄"
+            value={retirementAge}
+            setValue={setRetirementAge}
+          />
+          <Input
+            label="当前月薪 (¥)"
+            value={monthlyWage}
+            setValue={setMonthlyWage}
+          />
 
-        <label>所在城市</label>
-        <select className="border p-2 rounded" value={city} onChange={e => setCity(e.target.value)}>
-          <option value="shanghai">上海</option>
-          <option value="beijing">北京</option>
-          <option value="shenzhen">深圳</option>
-          <option value="national">全国平均</option>
-        </select>
+          <Input
+            label="已累计缴费年限（工作年限）"
+            value={yearsContributed}
+            setValue={setYearsContributed}
+            placeholder="如 3, 8, 12"
+          />
 
-        <label>企业年金水平</label>
-        <select className="border p-2 rounded" value={pillar2Level} onChange={e => setPillar2Level(e.target.value)}>
-          <option value="none">无</option>
-          <option value="basic">基础 (约3%)</option>
-          <option value="standard">标准 (约6%)</option>
-          <option value="generous">优厚 (约10%)</option>
-        </select>
+          <label>所在城市</label>
+          <select
+            className="border p-2 rounded"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          >
+            <option value="shanghai">上海</option>
+            <option value="beijing">北京</option>
+            <option value="shenzhen">深圳</option>
+            <option value="national">全国平均</option>
+          </select>
 
-        <button onClick={handleCalc} className="bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
-          计算退休缺口
-        </button>
-      </div>
+          <label>企业年金水平</label>
+          <select
+            className="border p-2 rounded"
+            value={pillar2Level}
+            onChange={(e) => setPillar2Level(e.target.value)}
+          >
+            <option value="none">无</option>
+            <option value="basic">基础 (约3%)</option>
+            <option value="standard">标准 (约6%)</option>
+            <option value="generous">优厚 (约10%)</option>
+          </select>
 
-      {result && (
-        <div className="bg-white p-6 rounded shadow space-y-3">
-          <p>基本养老金: <b>¥{result.p1.toFixed(0)}</b>/月</p>
-          <p>企业年金养老金: <b>¥{result.p2.toFixed(0)}</b>/月</p>
-          <p>目标退休收入: 最后工资的 <b>70%</b></p>
-          <p>收入缺口: <b>¥{result.gap.toFixed(0)}</b>/月</p>
-          <p>退休前需累计资金: <b>¥{result.requiredWealth.toLocaleString()}</b></p>
-          <p>每年需储蓄（低风险方案）: <b>¥{result.annualSaving.toFixed(0)}</b>/年</p>
+          <button
+            onClick={handleCalc}
+            className="bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+          >
+            计算退休缺口
+          </button>
         </div>
-      )}
-    </main>
+
+        {result && (
+          <div className="bg-white p-6 rounded shadow space-y-3">
+            <p>
+              基本养老金: <b>¥{result.p1.toFixed(0)}</b>/月
+            </p>
+            <p>
+              企业年金养老金: <b>¥{result.p2.toFixed(0)}</b>/月
+            </p>
+            <p>
+              目标退休收入: 最后工资的 <b>70%</b>
+            </p>
+            <p>
+              收入缺口: <b>¥{result.gap.toFixed(0)}</b>/月
+            </p>
+            <p>
+              退休前需累计资金: <b>¥{result.requiredWealth.toLocaleString()}</b>
+            </p>
+            <p>
+              每年需储蓄（低风险方案）: <b>¥{result.annualSaving.toFixed(0)}</b>
+              /年
+            </p>
+          </div>
+        )}
+      </main>
+    </>
   );
 }
 

@@ -6,13 +6,16 @@ import {
   computePillar2,
   computePillar3Gap,
 } from "@/lib/pension";
+import wageData from "./wage.json";
 
-const SOCIAL_AVG_WAGE = {
-  shanghai: 183000 / 12,
-  beijing: 195501 / 12,
-  shenzhen: 140052 / 12,
-  national: 107100 / 12,
-};
+// 城市选项（
+const PROVINCES = wageData.map((d) => d.province);
+
+// 返回选中省份对应的平均工资（每月）
+function getSocialAvg(province) {
+  const found = wageData.find((d) => d.province === province);
+  return found ? Number(found.avg_wage_all) : null;
+}
 
 // Simple, transparent tax model
 function computeTaxSaving(monthlySaving, marginalRate = 0.1) {
@@ -37,6 +40,8 @@ export default function Home() {
   const [showMethod, setShowMethod] = useState(false);
   const [targetReplacement, setTargetReplacement] = useState(70); // %
   const [preRetRealReturn, setPreRetRealReturn] = useState(0); // % 退休前“实际”年化收益
+  const [wageGrowth, setWageGrowth] = useState(3); // 预期年工资增长率（%）
+  const [inflation, setInflation] = useState(2.25); // 预期年通胀率（%）
   const [annuityDivisor, setAnnuityDivisor] = useState(139); // 默认60岁
   const [taxRate, setTaxRate] = useState(10); // % 边际税率（保守演示）
   const [customSocialAvg, setCustomSocialAvg] = useState(""); // 允许覆盖城市社平
@@ -44,7 +49,7 @@ export default function Home() {
   const retirementAge = 60;
   const socialAvg = customSocialAvg
     ? Number(customSocialAvg)
-    : SOCIAL_AVG_WAGE[city];
+    : getSocialAvg(city);
 
   let result = null;
   if (monthlyWage && age && yearsWorked) {
@@ -73,7 +78,8 @@ export default function Home() {
       p1.total,
       p2.monthly,
       {
-        preRetRealReturn: Number(preRetRealReturn) / 100,
+        g_w: wageGrowth / 100,
+        inf: inflation / 100,
         targetReplacement: Number(targetReplacement) / 100,
         annuityDivisor: Number(annuityDivisor),
       }
@@ -243,12 +249,15 @@ export default function Home() {
                 className="w-full border border-[#E5E5E5] rounded-lg px-4 py-3 pr-8 text-left bg-white"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
+                placeholder={`${socialAvg ? Math.round(socialAvg) : "未选择"}`}
+
               >
-                <option value="none">无</option>
-                <option value="shanghai">上海</option>
-                <option value="beijing">北京</option>
-                <option value="shenzhen">深圳</option>
-                <option value="national">全国平均</option>
+                <option value="">请选择所在省份</option>
+                {PROVINCES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
               </select>
 
               <input
@@ -316,8 +325,8 @@ export default function Home() {
                       <input
                         type="number"
                         className="text-right w-16 text-sm outline-none"
-                        value={preRetRealReturn}
-                        onChange={(e) => setPreRetRealReturn(e.target.value)}
+                        value={wageGrowth}
+                        onChange={(e) => setWageGrowth(Number(e.target.value))}
                       />
                     </div>
 
@@ -328,8 +337,8 @@ export default function Home() {
                       <input
                         type="number"
                         className="text-right w-16 text-sm outline-none"
-                        value={0}
-                        disabled
+                        value={inflation}
+                        onChange={(e) => setInflation(Number(e.target.value))}
                       />
                     </div>
 
@@ -351,9 +360,7 @@ export default function Home() {
                       </span>
                       <input
                         className="text-right w-20 text-sm outline-none"
-                        placeholder={`默认 ${Math.round(
-                          SOCIAL_AVG_WAGE[city]
-                        )}`}
+                        placeholder={`默认 ${socialAvg ? Math.round(socialAvg) : "未选择"}`}
                         value={customSocialAvg}
                         onChange={(e) => setCustomSocialAvg(e.target.value)}
                       />

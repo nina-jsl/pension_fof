@@ -1,55 +1,33 @@
-// src/lib/pension.js
-
-// --- Helpers ---
 const DIVISOR_MAP = { 60: 139, 55: 170, 50: 195 };
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
 /**
- * 基础养老金（统筹账户）
+ * 第一支柱统筹账户（以今天价格计）
  * pooling = (指数化月平均缴费工资 + 退休时社平) / 2 * (缴费年限 * 1%)
- * Here we freeze 社平工资 growth to keep numbers in today's ¥.
  */
-function pillar1PoolingToday({
-  monthlyWage,
-  socialAvgMonthly,
-  yearsTotal,
-}) {
-  // 缴费指数（法定 0.6~3.0）
+function pillar1PoolingToday({ monthlyWage, socialAvgMonthly, yearsTotal }) {
   const payIndex = clamp(monthlyWage / Math.max(1e-9, socialAvgMonthly), 0.6, 3.0);
-
-  // Freeze social average at today's level (no growth) for “today’s ¥”
-  const socialAvgAtRetire = socialAvgMonthly; // growth = 0
+  const socialAvgAtRetire = socialAvgMonthly; // freeze to today's ¥ for clarity
   const indexedAvg = payIndex * socialAvgAtRetire;
 
-  const pooling = ((indexedAvg + socialAvgAtRetire) / 2) * (yearsTotal * 0.01);
-  return pooling;
+  return ((indexedAvg + socialAvgAtRetire) / 2) * (yearsTotal * 0.01);
 }
 
 /**
- * 个人账户余额（今天的¥表达）
- * Only count past contributions, no wage growth, no account credit.
+ * 个人账户养老金余额（以今天价格计）
  */
-function personalAccountBalanceToday({
-  monthlyWage,
-  pastYears,
-}) {
-  // Contribution each year: 8% * 12 months
+function personalAccountBalanceToday({ monthlyWage, pastYears }) {
   const annualContrib = monthlyWage * 0.08 * 12;
   return annualContrib * Math.max(0, pastYears);
 }
 
 /**
- * 企业年金（今天的¥表达）
- * Only count past contributions, no wage growth, no fund return.
+ * 企业年金（月领取，今天价格计）
  */
-function pillar2MonthlyToday({
-  monthlyWage,
-  pastYears,
-  pillar2Level, // 'none' | 'basic' | 'standard' | 'generous'
-  retirementAge,
-}) {
+function pillar2MonthlyToday({ monthlyWage, pastYears, pillar2Level, retirementAge }) {
   const rateMap = { none: 0.0, basic: 0.03, standard: 0.06, generous: 0.10 };
   const rate = rateMap[pillar2Level] ?? 0.0;
+
   const annualContrib = monthlyWage * rate * 12;
   const balance = annualContrib * Math.max(0, pastYears);
 
@@ -58,53 +36,42 @@ function pillar2MonthlyToday({
 }
 
 /**
- * Pillar 1: returns { pooling, individual, total }
- * Inputs are current (today's) ¥; output is monthly ¥ in today's prices.
+ * 第一支柱：返回 { pooling, individual, total }
  */
 export function computePillar1(
   monthlyWage,
   socialAvgMonthly,
-  yearsWorked, // past years contributed
+  yearsWorked,
   age,
   retirementAge
 ) {
   const pastYears = Math.max(0, Number(yearsWorked) || 0);
-  const yearsToRetire = Math.max(0, (Number(retirementAge) || 60) - (Number(age) || 0));
+  const yearsToRetire = Math.max(0, (retirementAge || 60) - (age || 0));
   const yearsTotal = pastYears + yearsToRetire;
-
   const divisor = DIVISOR_MAP[retirementAge] ?? 139;
 
-  // 基础养老金（统筹）
   const pooling = pillar1PoolingToday({
-    monthlyWage: Number(monthlyWage) || 0,
-    socialAvgMonthly: Number(socialAvgMonthly) || 0,
+    monthlyWage,
+    socialAvgMonthly,
     yearsTotal,
   });
 
-  // 个人账户养老金（按余额/除数）
-  const individualMonthly =
-    personalAccountBalanceToday({
-      monthlyWage: Number(monthlyWage) || 0,
-      pastYears,
-    }) / divisor;
+  const individual = personalAccountBalanceToday({
+    monthlyWage,
+    pastYears,
+  }) / divisor;
 
-  const total = pooling + individualMonthly;
-  return {
-    pooling,
-    individual: individualMonthly,
-    total,
-    years_past: pastYears,
-    years_total: yearsTotal,
-  };
+  const total = pooling + individual;
+
+  return { pooling, individual, total, years_past: pastYears, years_total: yearsTotal };
 }
 
 /**
- * Pillar 2: returns { monthly, balance }
- * Inputs are current (today's) ¥; output is monthly ¥ in today's prices.
+ * 第二支柱：返回 { monthly, balance }
  */
 export function computePillar2(
   monthlyWage,
-  _socialAvgMonthly, // not needed here but kept for identical signature
+  _socialAvgMonthly,
   yearsWorked,
   age,
   retirementAge,
@@ -113,43 +80,56 @@ export function computePillar2(
   const pastYears = Math.max(0, Number(yearsWorked) || 0);
 
   const monthly = pillar2MonthlyToday({
-    monthlyWage: Number(monthlyWage) || 0,
+    monthlyWage,
     pastYears,
     pillar2Level,
     retirementAge,
   });
 
-  // Optional: expose the not-yet-annuitized balance for display/debug
   const balance = monthly * (DIVISOR_MAP[retirementAge] ?? 139);
 
   return { monthly, balance };
 }
 
 /**
- * Pillar 3 gap & suggested saving:
- * Target = 70% income replacement of current monthly wage (today's ¥).
- * gap = max(0, target - (pillar1_total + pillar2_monthly))
- * For a simple, conservative “enough and not wrong” calculator:
- * monthlySaving ≈ gap * divisor / monthsToRetire
- *  - assumes zero growth on savings and same annuity divisor at retirement
+ * 第三支柱缺口 & 月存额（Semi Model, 折回今天价格）
+ *  options:
+ *   - g_w  工资年增长率 (ex: 0.03)
+ *   - inf  年通胀率 (ex: 0.0225)
+ *   - targetReplacement 替代率 (ex: 0.70)
+ *   - annuityDivisor 退休后折算除数 (ex: 139)
  */
 export function computePillar3Gap(
   monthlyWage,
   age,
   retirementAge,
   pillar1TotalMonthly,
-  pillar2Monthly
+  pillar2Monthly,
+  {
+    g_w = 0.03,
+    inf = 0.0225,
+    targetReplacement = 0.7,
+    annuityDivisor = 139,
+  } = {}
 ) {
-  const target = 0.7 * (Number(monthlyWage) || 0);
-  const existing = (Number(pillar1TotalMonthly) || 0) + (Number(pillar2Monthly) || 0);
-  const gap = Math.max(0, target - existing);
+  const yearsToRetire = Math.max(0, retirementAge - age);
 
-  const yearsToRetire = Math.max(0, (Number(retirementAge) || 60) - (Number(age) || 0));
-  const monthsToRetire = Math.max(1, Math.round(yearsToRetire * 12)); // avoid divide-by-zero
-  const divisor = DIVISOR_MAP[retirementAge] ?? 139;
+  // Step 1: 退休前最后工资（名义）
+  const futureWage = monthlyWage * Math.pow(1 + g_w, yearsToRetire);
 
-  // Very conservative, transparent formula (no returns assumed)
-  const monthlySaving = (gap * divisor) / monthsToRetire;
+  // Step 2: 退休时目标收入（名义）
+  const targetNominal = futureWage * targetReplacement;
 
-  return { gap, monthlySaving, target };
+  // Step 3: 折现回今天的购买力
+  const targetReal = targetNominal / Math.pow(1 + inf, yearsToRetire);
+
+  const existingReal = pillar1TotalMonthly + pillar2Monthly;
+
+  const gap = Math.max(0, targetReal - existingReal);
+
+  // Step 4: 月存额（Real）
+  const monthsToRetire = Math.max(1, yearsToRetire * 12);
+  const monthlySaving = (gap * annuityDivisor) / monthsToRetire;
+
+  return { gap, monthlySaving, targetReal, futureWage };
 }

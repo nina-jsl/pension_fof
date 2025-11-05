@@ -207,22 +207,19 @@ function StickyCTA({ visible, saving = 0, tax = 0, onClick }) {
 /* ========================= Page ========================= */
 
 export default function Home() {
-  // ----- view state machine -----
-  const [view, setView] = useState("landing"); // 'landing' | 'input' | 'result'
-
-  // Modals / panels
+  // --- state (unchanged) ---
+  const [showInput, setShowInput] = useState(false);
   const [showTaxInfo, setShowTaxInfo] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showMethod, setShowMethod] = useState(false);
 
-  // Basic inputs
   const [city, setCity] = useState("");
   const [pillar2Level, setPillar2Level] = useState("none");
   const [monthlyWage, setMonthlyWage] = useState("");
   const [age, setAge] = useState("");
   const [yearsWorked, setYearsWorked] = useState("");
 
-  // Assumptions
+  const [showMethod, setShowMethod] = useState(false);
   const [targetReplacement, setTargetReplacement] = useState(70);
   const [preRetRealReturn, setPreRetRealReturn] = useState(0);
   const [wageGrowth, setWageGrowth] = useState(3);
@@ -231,50 +228,26 @@ export default function Home() {
   const [taxRate, setTaxRate] = useState(10);
   const [customSocialAvg, setCustomSocialAvg] = useState("");
 
-  // Derived
+  // --- derived inputs ---
   const retirementAge = 60;
   const socialAvg =
     customSocialAvg !== "" ? Number(customSocialAvg) : getSocialAvg(city) || 0;
 
-  // Results kept in state so 'result' view renders only them
-  const [result, setResult] = useState(null);
+  // IMPORTANT: declare result first
+  let result = null;
 
-  // Facts carousel data (placeholder)
-  const didYouKnow = useMemo(
-    () => [
-      {
-        title: "全球养老缺口正在扩大",
-        text: "2025 年 ×× 研究：全球有 ?% 的人，退休后 10 年内出现现金流缺口。",
-        source: "",
-      },
-      {
-        title: "中国现实",
-        text: "基本养老抚养比连续下行；企业年金覆盖低于 ?%。补第二支柱是关键。",
-        source: "",
-      },
-      {
-        title: "与你有关",
-        text: "如果你今天不调整，到 60 岁可能少 ? 万元购买力（以今天价格计）。",
-        source: "",
-      },
-    ],
-    []
-  );
-
-  // Compute once when user submits
-  function doCalc() {
-    if (!monthlyWage || !age || !yearsWorked) return;
-
-    const gw = Number(wageGrowth) / 100;
-    const cr = Number(preRetRealReturn) / 100 || 0;
+  // Only compute when we have the basics
+  if (monthlyWage && age && yearsWorked) {
+    const gw = Number(wageGrowth) / 100; // real wage growth
+    const cr = Number(preRetRealReturn) / 100 || 0; // real credit rate
 
     const p1 = computePillar1(
       Number(monthlyWage),
       socialAvg,
       Number(yearsWorked),
       Number(age),
-      retirementAge
-      // { g_w: gw, credit_rate: cr } // 如果已实现增长/利率，请解开
+      retirementAge,
+      { g_w: gw, credit_rate: cr } // <-- pass growth/credit here
     );
 
     const p2 = computePillar2(
@@ -283,10 +256,11 @@ export default function Home() {
       Number(yearsWorked),
       Number(age),
       retirementAge,
-      pillar2Level
-      // { g_w: gw, credit_rate: 0 } // 同上
+      pillar2Level || "none",
+      { g_w: gw, credit_rate: 0 } // show “无收益/不复利”
     );
 
+    // Pillar 3 缺口与月存
     const gapObj = computePillar3Gap(
       Number(monthlyWage),
       Number(age),
@@ -313,8 +287,14 @@ export default function Home() {
       },
     };
 
-    setResult(computed);
-    setView("result");
+    // optional quick sanity log
+    console.log("DEBUG", {
+      gw,
+      cr,
+      p1_pooling: p1.pooling.toFixed(2),
+      p1_individual: p1.individual.toFixed(2),
+      p2_monthly: p2.monthly.toFixed(2),
+    });
   }
 
   const currentMonthly =
@@ -323,6 +303,121 @@ export default function Home() {
   return (
     <div className="min-h-screen flex justify-center items-center bg-white">
       <div className="w-full max-w-[460px] px-6 text-center text-[#333]">
+        <AnimatePresence mode="wait">
+          {!showInput && (
+            <motion.div
+              key="result"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              {/* TITLE */}
+              <h1 className="text-xl font-semibold mt-6">
+                60岁的你，会过怎样的生活？
+              </h1>
+              <p className="text-sm text-[#999] mt-2">
+                退休不是很远，是每天都在靠近。
+              </p>
+
+              {/* Assumption chip */}
+              {/* <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFF0F2] text-[#FF4D6A] text-xs font-medium">
+                按<strong>零收益</strong>测算（不含理财/定存收益）
+              </div> */}
+              <div className="mt-4">
+                <button
+                  onClick={() => setShowMethod((v) => !v)}
+                  className="text-xs text-[#999] underline underline-offset-4"
+                >
+                  {showMethod ? "收起计算规则" : "计算规则 · 展开更多"}
+                </button>
+
+                <AnimatePresence>
+                  {showMethod && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="text-[13px] text-[#666] mt-3 leading-relaxed bg-[#FAFAFA] p-4 rounded-xl border border-[#EEE]"
+                    >
+                      <p>
+                        中国养老金由三大支柱构成：
+                        <strong>第一支柱（社保）</strong>、
+                        <strong>第二支柱（企业/职业年金）</strong>、
+                        <strong>第三支柱（个人储蓄）</strong>。
+                      </p>
+
+                      <p className="text-xs text-[#AAA] mt-2">
+                        注：我们默认你从参加工作当年开始正常缴纳养老保险（无断缴）。
+                      </p>
+
+                      <p className="mt-3 font-medium text-[#444]">
+                        ▸ 第一支柱 = 统筹养老金 + 个人账户养老金
+                      </p>
+                      <p className="mt-1">
+                        统筹养老金（基础养老金）按国家公式：
+                        <br />(<code>缴费指数 × 社平工资 + 社平工资</code>) ÷ 2
+                        × 缴费年限 × 1%。
+                      </p>
+                      <p>
+                        个人账户养老金 = 个人账户累计余额 ÷<code>计发月数</code>
+                        （退休年龄决定，如60岁≈139）。
+                      </p>
+
+                      <p className="mt-3 font-medium text-[#444]">
+                        ▸ 第二支柱（企业/职业年金）
+                      </p>
+                      <p>
+                        若单位为你缴纳企业/职业年金，则按工资的一定比例（如 3% /
+                        6% / 10%） 按月计入你的年金账户。
+                      </p>
+                      <p>
+                        企业年金月养老金 = 年金账户累计余额 ÷
+                        <code>计发月数</code>。
+                      </p>
+
+                      <p className="mt-3 font-medium text-[#444]">
+                        ▸ 第三支柱（个人自助退休储蓄）
+                      </p>
+                      <p>
+                        我们按世界银行建议，退休后维持退休前约
+                        <strong> {targetReplacement}% </strong>的收入替代率。
+                      </p>
+
+                      <p className="mt-3">
+                        <strong>差额</strong> = 目标退休收入 −（第一支柱 +
+                        第二支柱）
+                      </p>
+                      <p>
+                        <strong>月存额</strong> = 差额 × 计发月数 ÷ 距离退休月数
+                      </p>
+
+                      <p className="text-xs text-[#AAA] mt-3">
+                        注：所有金额均为“以今天购买力计”，未考虑理财或投资收益，旨在给出
+                        <strong>保守且直观</strong>的参考值。
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* RESULT */}
+              {result && (
+                <>
+                  <motion.div
+                    className="mt-6"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.1 }}
+                  >
+                    <p className="text-sm">你退休后每月预计可领：</p>
+                    <motion.p
+                      className="text-3xl font-bold text-[#FF4D6A] mt-1"
+                      animate={{ scale: [1, 1.06, 1] }}
+                      transition={{ duration: 0.6 }}
+                    >
+                      {result.p1.total.toFixed(0)} 元 / 月
+                    </motion.p>
+                  </motion.div>
 
         {/* --------- LANDING --------- */}
         {view === "landing" && (
@@ -343,23 +438,63 @@ export default function Home() {
               >
                 来算算你的未来的养老金
               </button>
-            </div>
-          </>
-        )}
+            </motion.div>
+          )}
 
-        {/* --------- INPUT --------- */}
-        {view === "input" && (
-          <motion.div
-            key="input"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="mt-8 space-y-4 text-left"
-          >
-            <div className="text-center">
-              <button
-                onClick={() => setShowMethod((v) => !v)}
-                className="text-xs text-[#999] underline underline-offset-4"
+          {/* INPUT + ADVANCED */}
+          {showInput && (
+            <motion.div
+              key="input"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mt-8 space-y-4 text-left"
+            >
+              <h2 className="text-sm text-center text-[#999]">
+                你当前所在的城市
+              </h2>
+              <select
+                className="w-full border border-[#E5E5E5] rounded-lg px-4 py-3 pr-8 text-left bg-white"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder={`${socialAvg ? Math.round(socialAvg) : "未选择"}`}
+              >
+                <option value="">请选择所在省份</option>
+                {PROVINCES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                className="w-full border border-[#E5E5E5] rounded-lg px-4 py-3 text-left text-[15px] focus:outline-none focus:ring-1 focus:ring-[#FF4D6A]"
+                placeholder="月薪（元）"
+                value={monthlyWage}
+                onChange={(e) => setMonthlyWage(e.target.value)}
+              />
+
+              <input
+                className="w-full border border-[#E5E5E5] rounded-lg px-4 py-3 text-left text-[15px] focus:outline-none focus:ring-1 focus:ring-[#FF4D6A]"
+                placeholder="年龄"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+              />
+
+              <input
+                className="w-full border border-[#E5E5E5] rounded-lg px-4 py-3 text-left text-[15px] focus:outline-none focus:ring-1 focus:ring-[#FF4D6A]"
+                placeholder="你已经工作了多久（年）"
+                value={yearsWorked}
+                onChange={(e) => setYearsWorked(e.target.value)}
+              />
+
+              <p className="text-sm text-center text-[#999] mt-2">
+                你所在单位的企业年金水平
+              </p>
+              <select
+                className="w-full border border-[#E5E5E5] rounded-lg px-4 py-3 pr-8 text-left bg-white"
+                value={pillar2Level}
+                onChange={(e) => setPillar2Level(e.target.value)}
               >
                 {showMethod ? "收起计算规则" : "计算规则 · 展开更多"}
               </button>
@@ -372,23 +507,80 @@ export default function Home() {
                     exit={{ opacity: 0, height: 0 }}
                     className="text-[13px] text-[#666] mt-3 leading-relaxed bg-[#FAFAFA] p-4 rounded-xl border border-[#EEE] text-left"
                   >
-                    <p>
-                      我们按世界银行建议，退休后维持退休前约
-                      <strong>{targetReplacement}%</strong> 的收入替代率。
-                    </p>
-                    <p className="mt-2">
-                      第一支柱（社保）≈ 统筹养老金 + 个人账户养老金
-                    </p>
-                    <p>第二支柱（企业年金）≈ 企业年金账户 ÷ 年金折算除数</p>
-                    <p className="mt-2">
-                      差额 = 目标退休收入 -（第一支柱 + 第二支柱）
-                    </p>
-                    <p className="mt-2">
-                      月存额 = 差额 × 年金折算除数 ÷ 距离退休月数
-                    </p>
-                    <p className="text-xs text-[#AAA] mt-3">
-                      注：此测算为“以今天价格计”，不含理财/存款收益。
-                    </p>
+                    {/* LIST ITEM */}
+                    <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
+                      <span className="text-sm text-[#333]">
+                        预期年工资增长率 (%)
+                      </span>
+                      <input
+                        type="number"
+                        className="text-right w-16 text-sm outline-none"
+                        value={wageGrowth}
+                        onChange={(e) => setWageGrowth(Number(e.target.value))}
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
+                      <span className="text-sm text-[#333]">
+                        预期年通胀率 (%)
+                      </span>
+                      <input
+                        type="number"
+                        className="text-right w-16 text-sm outline-none"
+                        value={inflation}
+                        onChange={(e) => setInflation(Number(e.target.value))}
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
+                      <span className="text-sm text-[#333]">
+                        预期第一支柱 年投资收益率(%)
+                      </span>
+                      <input
+                        type="number"
+                        className="text-right w-16 text-sm outline-none"
+                        value={2.75}
+                        disabled
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
+                      <span className="text-sm text-[#333]">
+                        所在城市平均月工资
+                      </span>
+                      <input
+                        className="text-right w-20 text-sm outline-none"
+                        placeholder={`默认 ${
+                          socialAvg ? Math.round(socialAvg) : "未选择"
+                        }`}
+                        value={customSocialAvg}
+                        onChange={(e) => setCustomSocialAvg(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
+                      <span className="text-sm text-[#333]">
+                        理想替代率 (%)
+                      </span>
+                      <input
+                        type="number"
+                        className="text-right w-16 text-sm outline-none"
+                        value={targetReplacement}
+                        onChange={(e) => setTargetReplacement(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center px-3 py-3">
+                      <span className="text-sm text-[#333]">
+                        社保缴纳比例 (%)
+                      </span>
+                      <input
+                        type="number"
+                        className="text-right w-16 text-sm outline-none"
+                        value={8}
+                        disabled
+                      />
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>

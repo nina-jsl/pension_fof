@@ -363,22 +363,66 @@ export default function Home() {
                     exit={{ opacity: 0, height: 0 }}
                     className="text-[13px] text-[#666] mt-3 leading-relaxed bg-[#FAFAFA] p-4 rounded-xl border border-[#EEE] text-left"
                   >
-                    <p>
+                    <p className="leading-relaxed">
                       我们按世界银行建议，退休后维持退休前约
                       <strong>{targetReplacement}%</strong> 的收入替代率。
+                      中国养老金由三大支柱构成：
+                      <strong> 第一支柱（社保）</strong>、
+                      <strong> 第二支柱（企业/职业年金）</strong>、
+                      <strong> 第三支柱（个人储蓄）</strong>。
                     </p>
+
+                    <p className="mt-3 font-medium text-[#444]">
+                      ▸ 第一支柱 = 统筹养老金 + 个人账户养老金
+                    </p>
+                    <p className="mt-1">
+                      统筹养老金按国家公式：
+                      <code>
+                        （缴费指数 × 社平工资 + 社平工资）÷ 2 × 缴费年限 × 1%
+                      </code>
+                      。
+                    </p>
+                    <p>
+                      个人账户养老金 = 个人账户累计余额 ÷<code>计发月数</code>
+                      （与退休年龄相关，如 60 岁 ≈ 139）。
+                    </p>
+
+                    <p className="mt-3 font-medium text-[#444]">
+                      ▸ 第二支柱（企业/职业年金）
+                    </p>
+                    <p>
+                      由单位按一定比例（如 3% / 6% / 10%）按月为你缴纳，退休时：
+                    </p>
+                    <p>
+                      企业年金月养老金 = 年金账户累计余额 ÷{" "}
+                      <code>计发月数</code>。
+                    </p>
+
+                    <p className="mt-3 font-medium text-[#444]">
+                      ▸ 第三支柱（自助退休储蓄）
+                    </p>
+                    <p className="mt-1">
+                      当第一、第二支柱不足以维持目标生活水平时，需要通过个人储蓄来补齐。
+                    </p>
+
+                    <p className="mt-4">
+                      我们以世界银行推荐的目标退休收入替代率
+                      <strong> {targetReplacement}% </strong>
+                      为参考，计算你未来需要的退休生活水平。
+                    </p>
+
+                    <p className="mt-1">
+                      差额 = 目标退休收入 −（第一支柱 + 第二支柱）
+                    </p>
+
                     <p className="mt-2">
-                      第一支柱（社保）≈ 统筹养老金 + 个人账户养老金
+                      <strong>月存额</strong> = 差额 × <code>计发月数</code> ÷
+                      距离退休的月数
                     </p>
-                    <p>第二支柱（企业年金）≈ 企业年金账户 ÷ 年金折算除数</p>
-                    <p className="mt-2">
-                      差额 = 目标退休收入 -（第一支柱 + 第二支柱）
-                    </p>
-                    <p className="mt-2">
-                      月存额 = 差额 × 年金折算除数 ÷ 距离退休月数
-                    </p>
-                    <p className="text-xs text-[#AAA] mt-3">
-                      注：此测算为“以今天价格计”，不含理财/存款收益。
+
+                    <p className="text-xs text-[#AAA] mt-4 leading-relaxed">
+                      注：以上计算均为“以今天购买力计”，未计入理财或存款收益，旨在提供
+                      <strong>保守且直观</strong>的退休规划参考。
                     </p>
                   </motion.div>
                 )}

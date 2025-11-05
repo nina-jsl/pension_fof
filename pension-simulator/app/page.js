@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react"; // ← add useEffect/useMemo/useRef
+import { useEffect, useMemo, useRef, useState, startTransition } from "react"; // ← add useEffect/useMemo/useRef
 import { motion, AnimatePresence } from "framer-motion";
 import {
   computePillar1,
@@ -7,6 +7,7 @@ import {
   computePillar3Gap,
 } from "@/lib/pension";
 import wageData from "./wage.json";
+import didYouKnowData from "./didYouKnow.json";
 
 // 城市选项（
 const PROVINCES = wageData.map((d) => d.province);
@@ -186,7 +187,11 @@ function StickyCTA({ visible, saving = 0, tax = 0, onClick }) {
         <div className="flex items-center justify-between">
           <div className="text-left">
             <p className="text-sm">
-              每月补 <span className="font-semibold text-[#FF4D6A]">{Math.round(saving)}</span> 元
+              每月补{" "}
+              <span className="font-semibold text-[#FF4D6A]">
+                {Math.round(saving)}
+              </span>{" "}
+              元
             </p>
             <p className="mt-0.5 text-[12px] text-[#999]">
               当年可少交税 ≈ {Math.round(tax)} 元
@@ -228,6 +233,7 @@ export default function Home() {
   const [annuityDivisor, setAnnuityDivisor] = useState(139);
   const [taxRate, setTaxRate] = useState(10);
   const [customSocialAvg, setCustomSocialAvg] = useState("");
+  const [didYouKnow, setDidYouKnow] = useState([]);
 
   // Derived
   const retirementAge = 60;
@@ -237,27 +243,9 @@ export default function Home() {
   // Results kept in state so 'result' view renders only them
   const [result, setResult] = useState(null);
 
-  // Facts carousel data (placeholder)
-  const didYouKnow = useMemo(
-    () => [
-      {
-        title: "全球养老缺口正在扩大",
-        text: "2025 年 ×× 研究：全球有 ?% 的人，退休后 10 年内出现现金流缺口。",
-        source: "",
-      },
-      {
-        title: "中国现实",
-        text: "基本养老抚养比连续下行；企业年金覆盖低于 ?%。补第二支柱是关键。",
-        source: "",
-      },
-      {
-        title: "与你有关",
-        text: "如果你今天不调整，到 60 岁可能少 ? 万元购买力（以今天价格计）。",
-        source: "",
-      },
-    ],
-    []
-  );
+  function pickRandom(list, n = 3) {
+    return [...list].sort(() => Math.random() - 0.5).slice(0, n);
+  }
 
   // Compute once when user submits
   function doCalc() {
@@ -315,13 +303,18 @@ export default function Home() {
     setView("result");
   }
 
-  const currentMonthly =
-    (result?.p1?.total || 0) + (result?.p2?.monthly || 0);
+  const currentMonthly = (result?.p1?.total || 0) + (result?.p2?.monthly || 0);
+
+  useEffect(() => {
+    // schedule state update in a transition so React knows it's intentional
+    startTransition(() => {
+      setDidYouKnow(pickRandom(didYouKnowData, 3));
+    });
+  }, []);
 
   return (
     <div className="min-h-screen flex justify-center items-center bg-white">
       <div className="w-full max-w-[460px] px-6 text-center text-[#333]">
-
         {/* --------- LANDING --------- */}
         {view === "landing" && (
           <>
@@ -440,7 +433,9 @@ export default function Home() {
               <option value="none">没有企业年金</option>
               <option value="basic">有，但比较少</option>
               <option value="standard">一般水平（多数大厂 / 外企）</option>
-              <option value="generous">福利较好（银行 / 保险 / 中央国企）</option>
+              <option value="generous">
+                福利较好（银行 / 保险 / 中央国企）
+              </option>
             </select>
 
             <div className="text-center mt-2">
@@ -463,7 +458,9 @@ export default function Home() {
                   className="overflow-hidden mt-3 bg-white rounded-xl border border-[#EEE]"
                 >
                   <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
-                    <span className="text-sm text-[#333]">预期年工资增长率 (%)</span>
+                    <span className="text-sm text-[#333]">
+                      预期年工资增长率 (%)
+                    </span>
                     <input
                       type="number"
                       className="text-right w-16 text-sm outline-none"
@@ -473,7 +470,9 @@ export default function Home() {
                   </div>
 
                   <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
-                    <span className="text-sm text-[#333]">预期年通胀率 (%)</span>
+                    <span className="text-sm text-[#333]">
+                      预期年通胀率 (%)
+                    </span>
                     <input
                       type="number"
                       className="text-right w-16 text-sm outline-none"
@@ -483,15 +482,26 @@ export default function Home() {
                   </div>
 
                   <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
-                    <span className="text-sm text-[#333]">预期第一支柱 年投资收益率(%)</span>
-                    <input type="number" className="text-right w-16 text-sm outline-none" value={2.75} disabled />
+                    <span className="text-sm text-[#333]">
+                      预期第一支柱 年投资收益率(%)
+                    </span>
+                    <input
+                      type="number"
+                      className="text-right w-16 text-sm outline-none"
+                      value={2.75}
+                      disabled
+                    />
                   </div>
 
                   <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
-                    <span className="text-sm text-[#333]">所在城市平均月工资</span>
+                    <span className="text-sm text-[#333]">
+                      所在城市平均月工资
+                    </span>
                     <input
                       className="text-right w-20 text-sm outline-none"
-                      placeholder={`默认 ${socialAvg ? Math.round(socialAvg) : "未选择"}`}
+                      placeholder={`默认 ${
+                        socialAvg ? Math.round(socialAvg) : "未选择"
+                      }`}
                       value={customSocialAvg}
                       onChange={(e) => setCustomSocialAvg(e.target.value)}
                     />
@@ -508,8 +518,15 @@ export default function Home() {
                   </div>
 
                   <div className="flex justify-between items-center px-3 py-3">
-                    <span className="text-sm text-[#333]">社保缴纳比例 (%)</span>
-                    <input type="number" className="text-right w-16 text-sm outline-none" value={8} disabled />
+                    <span className="text-sm text-[#333]">
+                      社保缴纳比例 (%)
+                    </span>
+                    <input
+                      type="number"
+                      className="text-right w-16 text-sm outline-none"
+                      value={8}
+                      disabled
+                    />
                   </div>
                 </motion.div>
               )}
@@ -561,7 +578,8 @@ export default function Home() {
 
             <div className="mt-6 bg-[#FFF5F7] p-5 rounded-xl text-left">
               <p className="text-sm">
-                要维持“正常生活”（约 {Number(targetReplacement).toFixed(0)}% 收入替代）
+                要维持“正常生活”（约 {Number(targetReplacement).toFixed(0)}%
+                收入替代）
               </p>
 
               {result.p3.gap > 0 ? (
@@ -583,7 +601,8 @@ export default function Home() {
                     onClick={() => setShowTaxInfo(true)}
                     className="text-sm text-[#FF4D6A] font-medium mt-3 underline underline-offset-4"
                   >
-                    当年可少交税 ≈ {result.p3.taxSaving.toFixed(0)} 元（怎么算？）
+                    当年可少交税 ≈ {result.p3.taxSaving.toFixed(0)}{" "}
+                    元（怎么算？）
                   </button>
                 </>
               ) : (
@@ -630,7 +649,9 @@ export default function Home() {
                 exit={{ y: 20, opacity: 0 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <h3 className="text-lg font-semibold">“少交税 ≈ XXX 元”怎么算？</h3>
+                <h3 className="text-lg font-semibold">
+                  “少交税 ≈ XXX 元”怎么算？
+                </h3>
                 <ol className="mt-3 text-sm text-[#555] list-decimal pl-4 space-y-2">
                   <li>
                     假设你每月按<span className="font-medium">税延养老</span>
@@ -638,7 +659,8 @@ export default function Home() {
                     <span className="font-medium">可税前扣除</span>的金额。
                   </li>
                   <li>
-                    我们按<strong>年扣除限额 12,000 元</strong>进行估算（保守且通用）。
+                    我们按<strong>年扣除限额 12,000 元</strong>
+                    进行估算（保守且通用）。
                   </li>
                   <li>
                     省税 ≈ <code>min(月存×12, 12000) × 你的边际税率</code>。

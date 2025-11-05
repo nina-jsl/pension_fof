@@ -6,13 +6,13 @@ import {
   computePillar2,
   computePillar3Gap,
 } from "@/lib/pension";
-import wageData from "./wage.json";
+import { WAGE_DATA } from "./wage";
 
 /* ========================= Helpers & Data ========================= */
-const PROVINCES = wageData.map((d) => d.province);
+const PROVINCES = WAGE_DATA.map((d) => d.province);
 
 function getSocialAvg(province) {
-  const found = wageData.find((d) => d.province === province);
+  const found = WAGE_DATA.find((d) => d.province === province);
   return found ? Number(found.avg_wage_all) : null;
 }
 
@@ -26,17 +26,26 @@ function computeTaxSaving(monthlySaving, marginalRate = 0.1) {
 
 // 0) 倒计时条（距离60岁）
 function UrgencyStrip({ age, retirementAge = 60 }) {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(null); // JS file: no TS generic
+
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    // update via a callback only (no immediate setState)
+    const tick = () => setNow(Date.now());
+    const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
+
   const yearsLeft = Math.max(0, retirementAge - Number(age || 0));
-  // 近似成天/秒，纯情绪化展示
-  const daysLeft = Math.max(
-    0,
-    Math.floor(yearsLeft * 365 - (now % 86400000) / 86400000)
-  );
+
+  // safe without initial `now`
+  const daysLeft = (() => {
+    if (now == null) return Math.floor(yearsLeft * 365);
+    const dayFrac = (now / 86_400_000) % 1;
+    return Math.max(0, Math.floor(yearsLeft * 365 - dayFrac));
+  })();
+
+  const pct = Math.min(100, (yearsLeft / 40) * 100);
+
   return (
     <div className="mt-4 rounded-xl border border-[#EEE] bg-[#FAFAFA] px-4 py-2 text-left">
       <div className="flex items-center justify-between text-xs text-[#666]">
@@ -44,19 +53,16 @@ function UrgencyStrip({ age, retirementAge = 60 }) {
         <span className="font-medium text-[#333]">{yearsLeft} 年</span>
       </div>
       <div className="mt-2 h-2 w-full rounded-full bg-[#F2F2F2] overflow-hidden">
-        <motion.div
+        <div
           className="h-full bg-[#FF4D6A]"
-          initial={{ width: "0%" }}
-          animate={{ width: `${Math.min(100, (yearsLeft / 40) * 100)}%` }}
-          transition={{ type: "spring", stiffness: 120, damping: 20 }}
+          style={{ width: `${pct}%`, transition: "width .4s ease" }}
         />
       </div>
-      <p className="mt-1 text-[11px] text-[#999]">
-        别拖了：每过 1 天，窗口期就缩短一点点。
-      </p>
+      <p className="mt-1 text-[11px] text-[#999]">大约还剩 {daysLeft} 天。</p>
     </div>
   );
 }
+
 
 // 1) 事实轮播（轻量，自动/手动切换）
 function DidYouKnowCarousel({ items = [] }) {

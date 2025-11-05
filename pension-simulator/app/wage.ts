@@ -1,4 +1,4 @@
-[
+export const WAGE_DATA = [
   { "province": "北京", "avg_wage_all": 11937 },
   { "province": "天津", "avg_wage_all": 8540 },
   { "province": "河北", "avg_wage_all": 6678 },

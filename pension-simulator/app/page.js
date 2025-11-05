@@ -622,7 +622,7 @@ export default function Home() {
 
             <div className="mt-6 bg-[#FFF5F7] p-5 rounded-xl text-left">
               <p className="text-sm">
-                要维持“正常生活”（约 {Number(targetReplacement).toFixed(0)}%
+                要维持品质退休生活（约 {Number(targetReplacement).toFixed(0)}%
                 收入替代）
               </p>
 

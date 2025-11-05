@@ -25,52 +25,59 @@ function computeTaxSaving(monthlySaving, marginalRate = 0.1) {
 }
 
 export default function Home() {
+  // --- state (unchanged) ---
   const [showInput, setShowInput] = useState(false);
   const [showTaxInfo, setShowTaxInfo] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Basic inputs
   const [city, setCity] = useState("");
-  const [pillar2Level, setPillar2Level] = useState("");
+  const [pillar2Level, setPillar2Level] = useState("none");
   const [monthlyWage, setMonthlyWage] = useState("");
   const [age, setAge] = useState("");
   const [yearsWorked, setYearsWorked] = useState("");
 
-  // Assumptions (可选可改)
   const [showMethod, setShowMethod] = useState(false);
-  const [targetReplacement, setTargetReplacement] = useState(70); // %
-  const [preRetRealReturn, setPreRetRealReturn] = useState(0); // % 退休前“实际”年化收益
-  const [wageGrowth, setWageGrowth] = useState(3); // 预期年工资增长率（%）
-  const [inflation, setInflation] = useState(2.25); // 预期年通胀率（%）
-  const [annuityDivisor, setAnnuityDivisor] = useState(139); // 默认60岁
-  const [taxRate, setTaxRate] = useState(10); // % 边际税率（保守演示）
-  const [customSocialAvg, setCustomSocialAvg] = useState(""); // 允许覆盖城市社平
+  const [targetReplacement, setTargetReplacement] = useState(70);
+  const [preRetRealReturn, setPreRetRealReturn] = useState(0);
+  const [wageGrowth, setWageGrowth] = useState(3);
+  const [inflation, setInflation] = useState(2.25);
+  const [annuityDivisor, setAnnuityDivisor] = useState(139);
+  const [taxRate, setTaxRate] = useState(10);
+  const [customSocialAvg, setCustomSocialAvg] = useState("");
 
+  // --- derived inputs ---
   const retirementAge = 60;
-  const socialAvg = customSocialAvg
-    ? Number(customSocialAvg)
-    : getSocialAvg(city);
+  const socialAvg =
+    customSocialAvg !== "" ? Number(customSocialAvg) : getSocialAvg(city) || 0;
 
+  // IMPORTANT: declare result first
   let result = null;
+
+  // Only compute when we have the basics
   if (monthlyWage && age && yearsWorked) {
-    // Pillar 1 & 2（保持“今天价格”的口径）
+    const gw = Number(wageGrowth) / 100; // real wage growth
+    const cr = Number(preRetRealReturn) / 100 || 0; // real credit rate
+
     const p1 = computePillar1(
       Number(monthlyWage),
       socialAvg,
       Number(yearsWorked),
       Number(age),
-      retirementAge
+      retirementAge,
+      { g_w: gw, credit_rate: cr } // <-- pass growth/credit here
     );
+
     const p2 = computePillar2(
       Number(monthlyWage),
       socialAvg,
       Number(yearsWorked),
       Number(age),
       retirementAge,
-      pillar2Level
+      pillar2Level || "none",
+      { g_w: gw, credit_rate: 0 } // show “无收益/不复利”
     );
 
-    // Pillar 3 缺口与月存（用可选收益假设）
+    // Pillar 3 缺口与月存
     const gapObj = computePillar3Gap(
       Number(monthlyWage),
       Number(age),
@@ -78,8 +85,8 @@ export default function Home() {
       p1.total,
       p2.monthly,
       {
-        g_w: wageGrowth / 100,
-        inf: inflation / 100,
+        g_w: gw,
+        inf: Number(inflation) / 100,
         targetReplacement: Number(targetReplacement) / 100,
         annuityDivisor: Number(annuityDivisor),
       }
@@ -96,6 +103,15 @@ export default function Home() {
         ),
       },
     };
+
+    // optional quick sanity log
+    console.log("DEBUG", {
+      gw,
+      cr,
+      p1_pooling: p1.pooling.toFixed(2),
+      p1_individual: p1.individual.toFixed(2),
+      p2_monthly: p2.monthly.toFixed(2),
+    });
   }
 
   return (
@@ -138,21 +154,58 @@ export default function Home() {
                       className="text-[13px] text-[#666] mt-3 leading-relaxed bg-[#FAFAFA] p-4 rounded-xl border border-[#EEE]"
                     >
                       <p>
-                        我们按世界银行建议，退休后维持退休前约
-                        <strong>{targetReplacement}%</strong> 的收入替代率。
+                        中国养老金由三大支柱构成：
+                        <strong>第一支柱（社保）</strong>、
+                        <strong>第二支柱（企业/职业年金）</strong>、
+                        <strong>第三支柱（个人储蓄）</strong>。
                       </p>
-                      <p className="mt-2">
-                        第一支柱（社保）≈ 统筹养老金 + 个人账户养老金
+
+                      <p className="mt-3 font-medium text-[#444]">
+                        ▸ 第一支柱 = 统筹养老金 + 个人账户养老金
                       </p>
-                      <p>第二支柱（企业年金）≈ 企业年金账户 ÷ 年金折算除数</p>
-                      <p className="mt-2">
-                        差额 = 目标退休收入 -（第一支柱 + 第二支柱）
+                      <p className="mt-1">
+                        统筹养老金按国家公式：(
+                        <code>缴费指数 × 社平工资 + 社平工资</code> ) ÷ 2 ×
+                        缴费年限 × 1%。
                       </p>
-                      <p className="mt-2">
-                        月存额 = 差额 × 年金折算除数 ÷ 距离退休月数
+                      <p>
+                        个人账户养老金 = 个人账户累计余额 ÷<code>计发月数</code>
+                        （与退休年龄相关，如60岁≈139）。
                       </p>
+
+                      <p className="mt-3 font-medium text-[#444]">
+                        ▸ 第二支柱（企业/职业年金）
+                      </p>
+                      <p>
+                        由单位按一定比例（如 3% / 6% /
+                        10%）按月为你缴纳，退休时：
+                      </p>
+                      <p>
+                        企业年金月养老金 = 年金账户累计余额 ÷
+                        <code>计发月数</code>。
+                      </p>
+
+                      <p className="mt-3 font-medium text-[#444]">
+                        ▸ 第三支柱（自助退休储蓄）
+                      </p>
+                      <p>
+                        我们以世界银行建议的退休收入替代率
+                        <strong> {targetReplacement}% </strong>
+                        为参考，计算你未来需要的生活水平。
+                      </p>
+
+                      <p className="mt-3">
+                        <strong>差额</strong> = 目标退休收入 −（第一支柱 +
+                        第二支柱）
+                      </p>
+                      <p>
+                        <strong>月存额</strong> = 差额 × 计发月数 ÷
+                        距离退休的月数
+                      </p>
+
                       <p className="text-xs text-[#AAA] mt-3">
-                        注：此测算为“以今天价格计”，不含理财/存款收益，目的是给你一个保守且直观的参考。
+                        注：以上均为“以今天购买力计”进行折算，不包含投资/存款收益，旨在给出
+                        <strong>保守且直观</strong>的退休规划参考值。
                       </p>
                     </motion.div>
                   )}
@@ -250,7 +303,6 @@ export default function Home() {
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
                 placeholder={`${socialAvg ? Math.round(socialAvg) : "未选择"}`}
-
               >
                 <option value="">请选择所在省份</option>
                 {PROVINCES.map((p) => (
@@ -360,7 +412,9 @@ export default function Home() {
                       </span>
                       <input
                         className="text-right w-20 text-sm outline-none"
-                        placeholder={`默认 ${socialAvg ? Math.round(socialAvg) : "未选择"}`}
+                        placeholder={`默认 ${
+                          socialAvg ? Math.round(socialAvg) : "未选择"
+                        }`}
                         value={customSocialAvg}
                         onChange={(e) => setCustomSocialAvg(e.target.value)}
                       />

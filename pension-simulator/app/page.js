@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react"; // ← add useEffect/useMemo/useRef
+import { useEffect, useMemo, useRef, useState, startTransition } from "react"; // ← add useEffect/useMemo/useRef
 import { motion, AnimatePresence } from "framer-motion";
 import {
   computePillar1,
@@ -7,6 +7,7 @@ import {
   computePillar3Gap,
 } from "@/lib/pension";
 import wageData from "./wage.json";
+import didYouKnowData from "./didYouKnow.json";
 
 // 城市选项（
 const PROVINCES = wageData.map((d) => d.province);
@@ -186,7 +187,11 @@ function StickyCTA({ visible, saving = 0, tax = 0, onClick }) {
         <div className="flex items-center justify-between">
           <div className="text-left">
             <p className="text-sm">
-              每月补 <span className="font-semibold text-[#FF4D6A]">{Math.round(saving)}</span> 元
+              每月补{" "}
+              <span className="font-semibold text-[#FF4D6A]">
+                {Math.round(saving)}
+              </span>{" "}
+              元
             </p>
             <p className="mt-0.5 text-[12px] text-[#999]">
               当年可少交税 ≈ {Math.round(tax)} 元
@@ -228,6 +233,7 @@ export default function Home() {
   const [annuityDivisor, setAnnuityDivisor] = useState(139);
   const [taxRate, setTaxRate] = useState(10);
   const [customSocialAvg, setCustomSocialAvg] = useState("");
+  const [didYouKnow, setDidYouKnow] = useState([]);
 
   // Derived
   const retirementAge = 60;
@@ -237,27 +243,9 @@ export default function Home() {
   // Results kept in state so 'result' view renders only them
   const [result, setResult] = useState(null);
 
-  // Facts carousel data (placeholder)
-  const didYouKnow = useMemo(
-    () => [
-      {
-        title: "全球养老缺口正在扩大",
-        text: "2025 年 ×× 研究：全球有 ?% 的人，退休后 10 年内出现现金流缺口。",
-        source: "",
-      },
-      {
-        title: "中国现实",
-        text: "基本养老抚养比连续下行；企业年金覆盖低于 ?%。补第二支柱是关键。",
-        source: "",
-      },
-      {
-        title: "与你有关",
-        text: "如果你今天不调整，到 60 岁可能少 ? 万元购买力（以今天价格计）。",
-        source: "",
-      },
-    ],
-    []
-  );
+  function pickRandom(list, n = 3) {
+    return [...list].sort(() => Math.random() - 0.5).slice(0, n);
+  }
 
   // Compute once when user submits
   function doCalc() {
@@ -315,13 +303,18 @@ export default function Home() {
     setView("result");
   }
 
-  const currentMonthly =
-    (result?.p1?.total || 0) + (result?.p2?.monthly || 0);
+  const currentMonthly = (result?.p1?.total || 0) + (result?.p2?.monthly || 0);
+
+  useEffect(() => {
+    // schedule state update in a transition so React knows it's intentional
+    startTransition(() => {
+      setDidYouKnow(pickRandom(didYouKnowData, 3));
+    });
+  }, []);
 
   return (
     <div className="min-h-screen flex justify-center items-center bg-white">
       <div className="w-full max-w-[460px] px-6 text-center text-[#333]">
-
         {/* --------- LANDING --------- */}
         {view === "landing" && (
           <>
@@ -370,22 +363,66 @@ export default function Home() {
                     exit={{ opacity: 0, height: 0 }}
                     className="text-[13px] text-[#666] mt-3 leading-relaxed bg-[#FAFAFA] p-4 rounded-xl border border-[#EEE] text-left"
                   >
-                    <p>
+                    <p className="leading-relaxed">
                       我们按世界银行建议，退休后维持退休前约
                       <strong>{targetReplacement}%</strong> 的收入替代率。
+                      中国养老金由三大支柱构成：
+                      <strong> 第一支柱（社保）</strong>、
+                      <strong> 第二支柱（企业/职业年金）</strong>、
+                      <strong> 第三支柱（个人储蓄）</strong>。
                     </p>
+
+                    <p className="mt-3 font-medium text-[#444]">
+                      ▸ 第一支柱 = 统筹养老金 + 个人账户养老金
+                    </p>
+                    <p className="mt-1">
+                      统筹养老金按国家公式：
+                      <code>
+                        （缴费指数 × 社平工资 + 社平工资）÷ 2 × 缴费年限 × 1%
+                      </code>
+                      。
+                    </p>
+                    <p>
+                      个人账户养老金 = 个人账户累计余额 ÷<code>计发月数</code>
+                      （与退休年龄相关，如 60 岁 ≈ 139）。
+                    </p>
+
+                    <p className="mt-3 font-medium text-[#444]">
+                      ▸ 第二支柱（企业/职业年金）
+                    </p>
+                    <p>
+                      由单位按一定比例（如 3% / 6% / 10%）按月为你缴纳，退休时：
+                    </p>
+                    <p>
+                      企业年金月养老金 = 年金账户累计余额 ÷{" "}
+                      <code>计发月数</code>。
+                    </p>
+
+                    <p className="mt-3 font-medium text-[#444]">
+                      ▸ 第三支柱（自助退休储蓄）
+                    </p>
+                    <p className="mt-1">
+                      当第一、第二支柱不足以维持目标生活水平时，需要通过个人储蓄来补齐。
+                    </p>
+
+                    <p className="mt-4">
+                      我们以世界银行推荐的目标退休收入替代率
+                      <strong> {targetReplacement}% </strong>
+                      为参考，计算你未来需要的退休生活水平。
+                    </p>
+
+                    <p className="mt-1">
+                      差额 = 目标退休收入 −（第一支柱 + 第二支柱）
+                    </p>
+
                     <p className="mt-2">
-                      第一支柱（社保）≈ 统筹养老金 + 个人账户养老金
+                      <strong>月存额</strong> = 差额 × <code>计发月数</code> ÷
+                      距离退休的月数
                     </p>
-                    <p>第二支柱（企业年金）≈ 企业年金账户 ÷ 年金折算除数</p>
-                    <p className="mt-2">
-                      差额 = 目标退休收入 -（第一支柱 + 第二支柱）
-                    </p>
-                    <p className="mt-2">
-                      月存额 = 差额 × 年金折算除数 ÷ 距离退休月数
-                    </p>
-                    <p className="text-xs text-[#AAA] mt-3">
-                      注：此测算为“以今天价格计”，不含理财/存款收益。
+
+                    <p className="text-xs text-[#AAA] mt-4 leading-relaxed">
+                      注：以上计算均为“以今天购买力计”，未计入理财或存款收益，旨在提供
+                      <strong>保守且直观</strong>的退休规划参考。
                     </p>
                   </motion.div>
                 )}
@@ -440,7 +477,9 @@ export default function Home() {
               <option value="none">没有企业年金</option>
               <option value="basic">有，但比较少</option>
               <option value="standard">一般水平（多数大厂 / 外企）</option>
-              <option value="generous">福利较好（银行 / 保险 / 中央国企）</option>
+              <option value="generous">
+                福利较好（银行 / 保险 / 中央国企）
+              </option>
             </select>
 
             <div className="text-center mt-2">
@@ -463,7 +502,9 @@ export default function Home() {
                   className="overflow-hidden mt-3 bg-white rounded-xl border border-[#EEE]"
                 >
                   <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
-                    <span className="text-sm text-[#333]">预期年工资增长率 (%)</span>
+                    <span className="text-sm text-[#333]">
+                      预期年工资增长率 (%)
+                    </span>
                     <input
                       type="number"
                       className="text-right w-16 text-sm outline-none"
@@ -473,7 +514,9 @@ export default function Home() {
                   </div>
 
                   <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
-                    <span className="text-sm text-[#333]">预期年通胀率 (%)</span>
+                    <span className="text-sm text-[#333]">
+                      预期年通胀率 (%)
+                    </span>
                     <input
                       type="number"
                       className="text-right w-16 text-sm outline-none"
@@ -483,15 +526,26 @@ export default function Home() {
                   </div>
 
                   <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
-                    <span className="text-sm text-[#333]">预期第一支柱 年投资收益率(%)</span>
-                    <input type="number" className="text-right w-16 text-sm outline-none" value={2.75} disabled />
+                    <span className="text-sm text-[#333]">
+                      预期第一支柱 年投资收益率(%)
+                    </span>
+                    <input
+                      type="number"
+                      className="text-right w-16 text-sm outline-none"
+                      value={2.75}
+                      disabled
+                    />
                   </div>
 
                   <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
-                    <span className="text-sm text-[#333]">所在城市平均月工资</span>
+                    <span className="text-sm text-[#333]">
+                      所在城市平均月工资
+                    </span>
                     <input
                       className="text-right w-20 text-sm outline-none"
-                      placeholder={`默认 ${socialAvg ? Math.round(socialAvg) : "未选择"}`}
+                      placeholder={`默认 ${
+                        socialAvg ? Math.round(socialAvg) : "未选择"
+                      }`}
                       value={customSocialAvg}
                       onChange={(e) => setCustomSocialAvg(e.target.value)}
                     />
@@ -508,8 +562,15 @@ export default function Home() {
                   </div>
 
                   <div className="flex justify-between items-center px-3 py-3">
-                    <span className="text-sm text-[#333]">社保缴纳比例 (%)</span>
-                    <input type="number" className="text-right w-16 text-sm outline-none" value={8} disabled />
+                    <span className="text-sm text-[#333]">
+                      社保缴纳比例 (%)
+                    </span>
+                    <input
+                      type="number"
+                      className="text-right w-16 text-sm outline-none"
+                      value={8}
+                      disabled
+                    />
                   </div>
                 </motion.div>
               )}
@@ -561,7 +622,8 @@ export default function Home() {
 
             <div className="mt-6 bg-[#FFF5F7] p-5 rounded-xl text-left">
               <p className="text-sm">
-                要维持“正常生活”（约 {Number(targetReplacement).toFixed(0)}% 收入替代）
+                要维持品质退休生活（约 {Number(targetReplacement).toFixed(0)}%
+                收入替代）
               </p>
 
               {result.p3.gap > 0 ? (
@@ -583,7 +645,8 @@ export default function Home() {
                     onClick={() => setShowTaxInfo(true)}
                     className="text-sm text-[#FF4D6A] font-medium mt-3 underline underline-offset-4"
                   >
-                    当年可少交税 ≈ {result.p3.taxSaving.toFixed(0)} 元（怎么算？）
+                    当年可少交税 ≈ {result.p3.taxSaving.toFixed(0)}{" "}
+                    元（怎么算？）
                   </button>
                 </>
               ) : (
@@ -630,7 +693,9 @@ export default function Home() {
                 exit={{ y: 20, opacity: 0 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <h3 className="text-lg font-semibold">“少交税 ≈ XXX 元”怎么算？</h3>
+                <h3 className="text-lg font-semibold">
+                  “少交税 ≈ XXX 元”怎么算？
+                </h3>
                 <ol className="mt-3 text-sm text-[#555] list-decimal pl-4 space-y-2">
                   <li>
                     假设你每月按<span className="font-medium">税延养老</span>
@@ -638,7 +703,8 @@ export default function Home() {
                     <span className="font-medium">可税前扣除</span>的金额。
                   </li>
                   <li>
-                    我们按<strong>年扣除限额 12,000 元</strong>进行估算（保守且通用）。
+                    我们按<strong>年扣除限额 12,000 元</strong>
+                    进行估算（保守且通用）。
                   </li>
                   <li>
                     省税 ≈ <code>min(月存×12, 12000) × 你的边际税率</code>。

@@ -24,3 +24,15 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+select, input {
+  text-align: center !important;
+  text-align-last: center !important;
+}
+
+.select {
+  background-image: url("data:image/svg+xml;utf8,<svg fill='%23999' height='12' width='12' viewBox='0 0 20 20'><path d='M5.5 7l4.5 4.5L14.5 7'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+}

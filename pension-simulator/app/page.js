@@ -362,12 +362,12 @@ export default function Home() {
 
             <p className="mt-2 text-[12px] text-[#666]">
               个人养老金（第三支柱）：税优账户、长期复利、专为退休。
-              <button
+              {/* <button
                 onClick={() => setShowMethod(true)}
                 className="ml-1 underline underline-offset-2 text-[#FF4D6A]"
               >
                 了解详情
-              </button>
+              </button> */}
             </p>
 
             <h1 className="text-xl font-semibold mt-6">
@@ -663,13 +663,34 @@ export default function Home() {
 
                 {result.p3.gap > 0 ? (
                   <div className="mt-4 rounded-xl bg-[#FFF7F8] p-4">
-                    <p className="text-[13px] text-[#6B2C2C]">
-                      要达到目标，你还需弥补：
-                    </p>
-                    <p className="mt-1 text-[24px] font-extrabold text-[#C03737]">
-                      ¥{result.p3.gap.toFixed(0)}{" "}
-                      <span className="text-[13px] font-semibold">/ 月</span>
-                    </p>
+                    <p className="text-[13px] text-[#6B2C2C]">要达到目标：</p>
+
+                    {/* A) 退休后每月缺口 */}
+                    <div className="mt-1">
+                      <p className="text-[12px] text-[#8A3B3B]">
+                        当前差距（退休后每月还差）
+                      </p>
+                      <p className="text-[24px] font-extrabold text-[#C03737] leading-tight">
+                        ¥{Math.round(result.p3.gap)}{" "}
+                        <span className="text-[13px] font-semibold">/ 月</span>
+                      </p>
+                    </div>
+
+                    {/* B) 建议现在每月存 */}
+                    <div className="mt-3">
+                      <p className="text-[12px] text-[#8A3B3B]">
+                        建议现在每月存
+                      </p>
+                      <p className="text-[22px] font-bold text-[#B22525] leading-tight">
+                        ¥{Math.round(result.p3.monthlySaving)}{" "}
+                        <span className="text-[13px] font-semibold">/ 月</span>
+                      </p>
+                      <p className="mt-1 text-[12px] text-[#8A3B3B]">
+                        依据公式：<code>缺口 × 计发月数 ÷ 剩余月数</code>
+                        （以今天价格计）。
+                      </p>
+                    </div>
+
                     {/* gentle urgency (one-year delay) */}
                     {(() => {
                       const monthsLeft = Math.max(
@@ -681,7 +702,7 @@ export default function Home() {
                         Math.max(1, monthsLeft - 12);
                       return (
                         <p className="mt-2 text-[12px] text-[#8A3B3B]">
-                          若<strong>再晚一年</strong>开始，每年需要的储蓄会从{" "}
+                          若<strong>再晚一年</strong>开始，建议每年储蓄将从{" "}
                           <strong>
                             ¥{Math.round(result.p3.monthlySaving * 12)}
                           </strong>{" "}
@@ -716,13 +737,15 @@ export default function Home() {
                 <div className="rounded-2xl bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
                   {(() => {
                     const yearsLeft = Math.max(0, 60 - Number(age || 0));
-                    const pmt = result.p3.monthlySaving;
+                    const pmt = Math.round(result.p3.monthlySaving);
+
                     const payout2p5 = projectMonthlyPayout({
                       monthlySaving: pmt,
                       yearsToRetire: yearsLeft,
                       realReturn: 0.025,
                       annuityDivisor,
                     });
+
                     const payout6 = projectMonthlyPayout({
                       monthlySaving: pmt,
                       yearsToRetire: yearsLeft,
@@ -732,8 +755,8 @@ export default function Home() {
                     return (
                       <>
                         <p className="text-[15px] font-semibold text-[#111]">
-                          同样每月存 {Math.round(pmt)}{" "}
-                          元，退休时可领（今天价格）
+                          同样每月存 <strong>¥{pmt}</strong>
+                          ，退休时可领（今天价格）
                         </p>
                         <div className="mt-3 grid grid-cols-2 gap-3">
                           <div className="rounded-xl bg-[#FAFAFA] p-4">
@@ -839,9 +862,7 @@ export default function Home() {
                       现在制定我的 FOF 计划
                     </button>
                     <button
-                      onClick={() =>
-                        window.scrollTo({ top: 0, behavior: "smooth" })
-                      }
+                      onClick={() => setView("input")}
                       className="text-[14px] font-semibold text-[#333]"
                     >
                       修改参数

@@ -1,76 +1,38 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, startTransition } from "react"; // ← add useEffect/useMemo/useRef
+import { useEffect, useRef, useState, startTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   computePillar1,
   computePillar2,
   computePillar3Gap,
+  projectMonthlyPayout,
 } from "@/lib/pension";
 import wageData from "./wage.json";
 import didYouKnowData from "./didYouKnow.json";
 
-// 城市选项（
+// ---------------------- Utils & Data ----------------------
 const PROVINCES = wageData.map((d) => d.province);
-
-// 返回选中省份对应的平均工资（每月）
 function getSocialAvg(province) {
   const found = wageData.find((d) => d.province === province);
   return found ? Number(found.avg_wage_all) : null;
 }
-
-// Simple, transparent tax model
 function computeTaxSaving(monthlySaving, marginalRate = 0.1) {
   const annual = monthlySaving * 12;
-  const deductible = Math.min(annual, 12000); // 专项附加扣除上限（便于解释，不会说错）
+  const deductible = Math.min(annual, 12000);
   return deductible * marginalRate;
 }
-// 0) 倒计时条（距离60岁）
-function UrgencyStrip({ age, retirementAge = 60 }) {
-  const [now, setNow] = useState(null); // ← was Date.now()
 
-  useEffect(() => {
-    const tick = () => setNow(Date.now());
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const yearsLeft = Math.max(0, retirementAge - Number(age || 0));
-
-  // 近似成天/秒，纯情绪化展示（允许首屏 now===null）
-  const daysLeft = (() => {
-    if (now == null) return Math.floor(yearsLeft * 365);
-    const dayFrac = (now / 86_400_000) % 1;
-    return Math.max(0, Math.floor(yearsLeft * 365 - dayFrac));
-  })();
-
-  return (
-    <div className="mt-4 rounded-xl border border-[#EEE] bg-[#FAFAFA] px-4 py-2 text-left">
-      <div className="flex items-center justify-between text-xs text-[#666]">
-        <span>距离 60 岁还有</span>
-        <span className="font-medium text-[#333]">{yearsLeft} 年</span>
-      </div>
-      <div className="mt-2 h-2 w-full rounded-full bg-[#F2F2F2] overflow-hidden">
-        <motion.div
-          className="h-full bg-[#FF4D6A]"
-          initial={{ width: "0%" }}
-          animate={{ width: `${Math.min(100, (yearsLeft / 40) * 100)}%` }}
-          transition={{ type: "spring", stiffness: 120, damping: 20 }}
-        />
-      </div>
-      <p className="mt-1 text-[11px] text-[#999]">
-        别拖了：每过 1 天，窗口期就缩短一点点。约剩 {daysLeft} 天。
-      </p>
-    </div>
-  );
-}
-// 1) 事实轮播（轻量，自动/手动切换）
+// ---------------------- Small UI Atoms ----------------------
 function DidYouKnowCarousel({ items = [] }) {
   const [idx, setIdx] = useState(0);
   const timerRef = useRef(null);
+
   useEffect(() => {
-    timerRef.current = setInterval(() => {
-      setIdx((i) => (i + 1) % items.length);
-    }, 3600);
+    if (!items.length) return;
+    timerRef.current = setInterval(
+      () => setIdx((i) => (i + 1) % items.length),
+      3600
+    );
     return () => clearInterval(timerRef.current);
   }, [items.length]);
 
@@ -118,44 +80,109 @@ function DidYouKnowCarousel({ items = [] }) {
   );
 }
 
-// 2) 缺口热条
-function GapHeatbar({ value = 0, max = 20000 }) {
-  const pct = Math.max(0, Math.min(1, value / max));
+function AccordionSection({ title, children, defaultOpen = false, badge }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="mt-5">
-      <div className="flex items-center justify-between text-xs text-[#666]">
-        <span>缺口热度</span>
-        <span>{Math.round(pct * 100)}%</span>
-      </div>
-      <div className="relative mt-2 h-3 w-full rounded-full bg-gradient-to-r from-[#FFE6EA] via-[#FF9AAE] to-[#FF4D6A]">
-        <motion.div
-          className="absolute left-0 top-0 h-3 rounded-full bg-white/50"
-          initial={{ width: "0%" }}
-          animate={{ width: `${pct * 100}%` }}
-          transition={{ type: "spring", stiffness: 120, damping: 18 }}
-        />
-        {value > 0 && (
+    <div className="rounded-xl border border-[#EEE] bg-white">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left"
+      >
+        <span className="text-sm font-medium text-[#333] flex items-center gap-2">
+          {title}
+          {badge && (
+            <span className="text-[10px] rounded-full bg-[#F5F5F5] px-2 py-0.5 text-[#777]">
+              {badge}
+            </span>
+          )}
+        </span>
+        <svg
+          className={`h-4 w-4 text-[#999] transition-transform ${
+            open ? "rotate-180" : "rotate-0"
+          }`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
           <motion.div
-            className="absolute -top-1.5 h-6 w-6 rounded-full border-2 border-white"
-            style={{ left: `calc(${pct * 100}% - 12px)` }}
-            animate={{ scale: [1, 1.08, 1] }}
-            transition={{ duration: 0.8, repeat: Infinity }}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="px-4 pb-4 text-[13px] text-[#555]"
           >
-            <div className="h-full w-full rounded-full bg-[#FF4D6A]/80" />
+            {children}
           </motion.div>
         )}
-      </div>
-      <p className="mt-2 text-[12px] text-[#999]">
-        按“今天价格”估算，越红说明你的现金流断档越明显。
-      </p>
+      </AnimatePresence>
     </div>
   );
 }
 
-// 3) 两条未来（对比卡）
+function GapBar({ current = 0, target = 0, mode = "amount" }) {
+  const [hover, setHover] = useState(false);
+  const safeTarget = Math.max(target, 0.0001);
+  const pct = Math.min(1, Math.max(0, current / safeTarget));
+  const gap = Math.max(0, safeTarget - current);
+  const centerLabel =
+    mode === "percent"
+      ? `${Math.round(pct * 100)}%`
+      : `¥${Math.round(current)} / ¥${Math.round(safeTarget)}`;
+  return (
+    <div className="mt-2">
+      <div className="flex justify-between text-xs text-[#666] mb-1">
+        <span>退休准备进度</span>
+        <span>{Math.round(pct * 100)}%</span>
+      </div>
+      <div
+        className="relative h-4 rounded-full bg-[#F2F2F2] overflow-hidden"
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+      >
+        <motion.div
+          className="h-full bg-gradient-to-r from-[#FF9AAE] to-[#FF4D6A]"
+          initial={{ width: 0 }}
+          animate={{ width: `${pct * 100}%` }}
+          transition={{ duration: 0.6 }}
+        />
+        <div className="absolute inset-0 flex items-center justify-center text-[11px] text-white font-medium pointer-events-none">
+          {centerLabel}
+        </div>
+        <AnimatePresence>
+          {hover && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              className="absolute left-1/2 top-full z-10 mt-2 w-max -translate-x-1/2 rounded-lg border border-[#EEE] bg-white px-3 py-2 text-[12px] text-[#444] shadow"
+            >
+              <div>
+                预计可领：<strong>¥{Math.round(current)}</strong>
+              </div>
+              <div>
+                目标水平：<strong>¥{Math.round(safeTarget)}</strong>
+              </div>
+              <div>
+                当前差距：<strong>¥{Math.round(gap)}</strong>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
 function PathCompare({ currentMonthly = 0, targetMonthly = 0 }) {
   return (
-    <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div className="rounded-xl border border-[#EEE] bg-[#FAFAFA] p-4">
         <p className="text-xs text-[#999]">照现在</p>
         <p className="mt-1 text-lg font-semibold text-[#333]">
@@ -178,7 +205,27 @@ function PathCompare({ currentMonthly = 0, targetMonthly = 0 }) {
   );
 }
 
-// 4) 底部固定 CTA
+function EarlyStartCompare({ monthsLeft, gap, annuityDivisor, monthlySaving }) {
+  if (monthsLeft <= 0 || gap <= 0) return null;
+  const earlyMonths = monthsLeft + 60; // 提前5年
+  const earlyMonthlySaving = (gap * Number(annuityDivisor)) / earlyMonths;
+  const reduction = monthlySaving - earlyMonthlySaving;
+  const reductionPct = reduction / monthlySaving;
+  return (
+    <div className="rounded-xl bg-[#EAFBF3] border border-[#C6EBD8] p-4 text-left">
+      <p className="text-sm font-medium text-[#2A7259]">
+        其实现在开始，还来得及很多 🌱
+      </p>
+      <p className="mt-2 text-[13px] text-[#4A4A4A] leading-relaxed">
+        若<strong>提前 5 年</strong>开始同样规划，你每月需要存的金额将从
+        <strong> ¥{Math.round(monthlySaving)}</strong> 降至
+        <strong> ¥{Math.round(earlyMonthlySaving)}</strong>，约减少{" "}
+        <strong>{Math.round(reductionPct * 100)}%</strong>。
+      </p>
+    </div>
+  );
+}
+
 function StickyCTA({ visible, saving = 0, tax = 0, onClick }) {
   if (!visible) return null;
   return (
@@ -209,23 +256,23 @@ function StickyCTA({ visible, saving = 0, tax = 0, onClick }) {
   );
 }
 
+// ---------------------- Page Component ----------------------
 export default function Home() {
-  // ----- view state machine -----
+  // views
   const [view, setView] = useState("landing"); // 'landing' | 'input' | 'result'
 
-  // Modals / panels
-  const [showTaxInfo, setShowTaxInfo] = useState(false);
+  // toggles
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showMethod, setShowMethod] = useState(false);
 
-  // Basic inputs
+  // inputs
   const [city, setCity] = useState("");
   const [pillar2Level, setPillar2Level] = useState("none");
   const [monthlyWage, setMonthlyWage] = useState("");
   const [age, setAge] = useState("");
   const [yearsWorked, setYearsWorked] = useState("");
 
-  // Assumptions
+  // assumptions
   const [targetReplacement, setTargetReplacement] = useState(70);
   const [preRetRealReturn, setPreRetRealReturn] = useState(0);
   const [wageGrowth, setWageGrowth] = useState(3);
@@ -235,24 +282,25 @@ export default function Home() {
   const [customSocialAvg, setCustomSocialAvg] = useState("");
   const [didYouKnow, setDidYouKnow] = useState([]);
 
-  // Derived
+  // derived
   const retirementAge = 60;
   const socialAvg =
     customSocialAvg !== "" ? Number(customSocialAvg) : getSocialAvg(city) || 0;
-
-  // Results kept in state so 'result' view renders only them
   const [result, setResult] = useState(null);
 
-  function pickRandom(list, n = 3) {
-    return [...list].sort(() => Math.random() - 0.5).slice(0, n);
-  }
+  // progress label mode
+  const [progressMode, setProgressMode] = useState("amount"); // 'amount'|'percent'
 
-  // Compute once when user submits
+  // init did-you-know items
+  useEffect(() => {
+    startTransition(() => setDidYouKnow([...didYouKnowData]));
+  }, []);
+
   function doCalc() {
     if (!monthlyWage || !age || !yearsWorked) return;
 
     const gw = Number(wageGrowth) / 100;
-    const cr = Number(preRetRealReturn) / 100 || 0;
+    // const cr = Number(preRetRealReturn) / 100 || 0; // reserved if adding crediting
 
     const p1 = computePillar1(
       Number(monthlyWage),
@@ -260,7 +308,6 @@ export default function Home() {
       Number(yearsWorked),
       Number(age),
       retirementAge
-      // { g_w: gw, credit_rate: cr } // 如果已实现增长/利率，请解开
     );
 
     const p2 = computePillar2(
@@ -270,7 +317,6 @@ export default function Home() {
       Number(age),
       retirementAge,
       pillar2Level
-      // { g_w: gw, credit_rate: 0 } // 同上
     );
 
     const gapObj = computePillar3Gap(
@@ -304,27 +350,31 @@ export default function Home() {
   }
 
   const currentMonthly = (result?.p1?.total || 0) + (result?.p2?.monthly || 0);
-
-  useEffect(() => {
-    // schedule state update in a transition so React knows it's intentional
-    startTransition(() => {
-      setDidYouKnow(pickRandom(didYouKnowData, 3));
-    });
-  }, []);
+  const kpiColor = (ok) => (ok ? "text-[#2A7259]" : "text-[#FF4D6A]");
 
   return (
     <div className="min-h-screen flex justify-center items-center bg-white">
-      <div className="w-full max-w-[460px] px-6 text-center text-[#333]">
+      <div className="w-full max-w-[460px] px-6 text-center text-[#333] pb-28">
         {/* --------- LANDING --------- */}
         {view === "landing" && (
           <>
             <DidYouKnowCarousel items={didYouKnow} />
 
+            <p className="mt-2 text-[12px] text-[#666]">
+              个人养老金（第三支柱）：税优账户、长期复利、专为退休。
+              {/* <button
+                onClick={() => setShowMethod(true)}
+                className="ml-1 underline underline-offset-2 text-[#FF4D6A]"
+              >
+                了解详情
+              </button> */}
+            </p>
+
             <h1 className="text-xl font-semibold mt-6">
               60岁的你，会过怎样的生活？
             </h1>
             <p className="text-sm text-[#999] mt-2">
-              退休不是很远，是每天都在靠近。
+              我们用最少输入，给你一个清晰的退休图景。
             </p>
 
             <div className="mt-8">
@@ -347,6 +397,7 @@ export default function Home() {
             exit={{ opacity: 0 }}
             className="mt-8 space-y-4 text-left"
           >
+            {/* 规则（折叠，默认收起） */}
             <div className="text-center">
               <button
                 onClick={() => setShowMethod((v) => !v)}
@@ -363,66 +414,16 @@ export default function Home() {
                     exit={{ opacity: 0, height: 0 }}
                     className="text-[13px] text-[#666] mt-3 leading-relaxed bg-[#FAFAFA] p-4 rounded-xl border border-[#EEE] text-left"
                   >
-                    <p className="leading-relaxed">
-                      我们按世界银行建议，退休后维持退休前约
-                      <strong>{targetReplacement}%</strong> 的收入替代率。
-                      中国养老金由三大支柱构成：
+                    <p>
+                      我们按世界银行建议，退休后维持退休前约{" "}
+                      <strong>{targetReplacement}%</strong>{" "}
+                      的收入替代率。中国养老金由三大支柱构成：
                       <strong> 第一支柱（社保）</strong>、
                       <strong> 第二支柱（企业/职业年金）</strong>、
-                      <strong> 第三支柱（个人储蓄）</strong>。
+                      <strong> 第三支柱（个人养老金）</strong>。
                     </p>
-
-                    <p className="mt-3 font-medium text-[#444]">
-                      ▸ 第一支柱 = 统筹养老金 + 个人账户养老金
-                    </p>
-                    <p className="mt-1">
-                      统筹养老金按国家公式：
-                      <code>
-                        （缴费指数 × 社平工资 + 社平工资）÷ 2 × 缴费年限 × 1%
-                      </code>
-                      。
-                    </p>
-                    <p>
-                      个人账户养老金 = 个人账户累计余额 ÷<code>计发月数</code>
-                      （与退休年龄相关，如 60 岁 ≈ 139）。
-                    </p>
-
-                    <p className="mt-3 font-medium text-[#444]">
-                      ▸ 第二支柱（企业/职业年金）
-                    </p>
-                    <p>
-                      由单位按一定比例（如 3% / 6% / 10%）按月为你缴纳，退休时：
-                    </p>
-                    <p>
-                      企业年金月养老金 = 年金账户累计余额 ÷{" "}
-                      <code>计发月数</code>。
-                    </p>
-
-                    <p className="mt-3 font-medium text-[#444]">
-                      ▸ 第三支柱（自助退休储蓄）
-                    </p>
-                    <p className="mt-1">
-                      当第一、第二支柱不足以维持目标生活水平时，需要通过个人储蓄来补齐。
-                    </p>
-
-                    <p className="mt-4">
-                      我们以世界银行推荐的目标退休收入替代率
-                      <strong> {targetReplacement}% </strong>
-                      为参考，计算你未来需要的退休生活水平。
-                    </p>
-
-                    <p className="mt-1">
-                      差额 = 目标退休收入 −（第一支柱 + 第二支柱）
-                    </p>
-
-                    <p className="mt-2">
-                      <strong>月存额</strong> = 差额 × <code>计发月数</code> ÷
-                      距离退休的月数
-                    </p>
-
-                    <p className="text-xs text-[#AAA] mt-4 leading-relaxed">
-                      注：以上计算均为“以今天购买力计”，未计入理财或存款收益，旨在提供
-                      <strong>保守且直观</strong>的退休规划参考。
+                    <p className="mt-2 text-[12px] text-[#999]">
+                      注：本工具以“今天购买力”口径演示，旨在直观、保守地说明缺口与补齐方案。
                     </p>
                   </motion.div>
                 )}
@@ -482,6 +483,7 @@ export default function Home() {
               </option>
             </select>
 
+            {/* 可选项（折叠，默认收起） */}
             <div className="text-center mt-2">
               <button
                 type="button"
@@ -491,7 +493,6 @@ export default function Home() {
                 {showAdvanced ? "收起可选项" : "可选项 · 展开更多"}
               </button>
             </div>
-
             <AnimatePresence initial={false}>
               {showAdvanced && (
                 <motion.div
@@ -527,13 +528,15 @@ export default function Home() {
 
                   <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
                     <span className="text-sm text-[#333]">
-                      预期第一支柱 年投资收益率(%)
+                      退休折算除数（计发月数）
                     </span>
                     <input
                       type="number"
                       className="text-right w-16 text-sm outline-none"
-                      value={2.75}
-                      disabled
+                      value={annuityDivisor}
+                      onChange={(e) =>
+                        setAnnuityDivisor(Number(e.target.value) || 139)
+                      }
                     />
                   </div>
 
@@ -542,7 +545,7 @@ export default function Home() {
                       所在城市平均月工资
                     </span>
                     <input
-                      className="text-right w-20 text-sm outline-none"
+                      className="text-right w-24 text-sm outline-none"
                       placeholder={`默认 ${
                         socialAvg ? Math.round(socialAvg) : "未选择"
                       }`}
@@ -551,25 +554,43 @@ export default function Home() {
                     />
                   </div>
 
-                  <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
-                    <span className="text-sm text-[#333]">理想替代率 (%)</span>
+                  <div className="flex flex-col px-3 py-3 border-b border-[#F3F3F3]">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm text-[#333]">
+                        理想替代率 (%)
+                      </span>
+                      <input
+                        type="number"
+                        className="text-right w-16 text-sm outline-none"
+                        value={targetReplacement}
+                        onChange={(e) =>
+                          setTargetReplacement(Number(e.target.value))
+                        }
+                      />
+                    </div>
                     <input
-                      type="number"
-                      className="text-right w-16 text-sm outline-none"
+                      type="range"
+                      min={50}
+                      max={100}
+                      step={5}
                       value={targetReplacement}
-                      onChange={(e) => setTargetReplacement(e.target.value)}
+                      onChange={(e) =>
+                        setTargetReplacement(Number(e.target.value))
+                      }
+                      className="w-full accent-[#FF4D6A]"
                     />
+                    <p className="text-[11px] text-[#999] mt-1">
+                      70%为世界银行建议标准，可上调以追求更高品质生活。
+                    </p>
                   </div>
 
                   <div className="flex justify-between items-center px-3 py-3">
-                    <span className="text-sm text-[#333]">
-                      社保缴纳比例 (%)
-                    </span>
+                    <span className="text-sm text-[#333]">边际税率(%)</span>
                     <input
                       type="number"
                       className="text-right w-16 text-sm outline-none"
-                      value={8}
-                      disabled
+                      value={taxRate}
+                      onChange={(e) => setTaxRate(Number(e.target.value))}
                     />
                   </div>
                 </motion.div>
@@ -593,136 +614,274 @@ export default function Home() {
           </motion.div>
         )}
 
-        {/* --------- RESULT --------- */}
         {view === "result" && result && (
           <>
-            {/* 倒计时条：现在只在结果页显示 */}
-            {Number.isFinite(Number(age)) &&
-              Number(retirementAge) > Number(age) && (
-                <UrgencyStrip age={age} retirementAge={retirementAge} />
+            {/* ===== iOS-style spacing container ===== */}
+            <section className="mt-8 text-left space-y-6">
+              {/* 1) Ready + Gap (primary card) */}
+              <div className="rounded-2xl bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-[15px] font-semibold text-[#111]">
+                    你的退休准备
+                  </h2>
+                  {result.p3.gap <= 0 ? (
+                    <span className="text-[11px] px-2 py-1 rounded-full bg-[#EEFFF6] text-[#1B7A55]">
+                      已准备好
+                    </span>
+                  ) : (
+                    <span className="text-[11px] px-2 py-1 rounded-full bg-[#FFF2F2] text-[#B22525]">
+                      未达标
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl bg-[#FAFAFA] p-4">
+                    <p className="text-[12px] text-[#8B8B8B]">按今天价格估算</p>
+                    <p className="mt-1 text-[28px] leading-none font-extrabold text-[#222]">
+                      ¥{Math.round(result.p1.total + result.p2.monthly)}{" "}
+                      <span className="text-[14px] font-semibold">/ 月</span>
+                    </p>
+                    <p className="mt-1 text-[12px] text-[#9B9B9B]">
+                      （第一支柱 + 第二支柱）
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-[#FAFAFA] p-4">
+                    <p className="text-[12px] text-[#8B8B8B]">
+                      目标（{Number(targetReplacement).toFixed(0)}% 收入替代率）
+                    </p>
+                    <p className="mt-1 text-[28px] leading-none font-extrabold text-[#222]">
+                      ¥{Math.round(result.p3.targetReal)}{" "}
+                      <span className="text-[14px] font-semibold">/ 月</span>
+                    </p>
+                    <p className="mt-1 text-[12px] text-[#9B9B9B]">
+                      以今天价格计
+                    </p>
+                  </div>
+                </div>
+
+                {result.p3.gap > 0 ? (
+                  <div className="mt-4 rounded-xl bg-[#FFF7F8] p-4">
+                    <p className="text-[13px] text-[#6B2C2C]">要达到目标：</p>
+
+                    {/* A) 退休后每月缺口 */}
+                    <div className="mt-1">
+                      <p className="text-[12px] text-[#8A3B3B]">
+                        当前差距（退休后每月还差）
+                      </p>
+                      <p className="text-[24px] font-extrabold text-[#C03737] leading-tight">
+                        ¥{Math.round(result.p3.gap)}{" "}
+                        <span className="text-[13px] font-semibold">/ 月</span>
+                      </p>
+                    </div>
+
+                    {/* B) 建议现在每月存 */}
+                    <div className="mt-3">
+                      <p className="text-[12px] text-[#8A3B3B]">
+                        建议现在每月存
+                      </p>
+                      <p className="text-[22px] font-bold text-[#B22525] leading-tight">
+                        ¥{Math.round(result.p3.monthlySaving)}{" "}
+                        <span className="text-[13px] font-semibold">/ 月</span>
+                      </p>
+                      <p className="mt-1 text-[12px] text-[#8A3B3B]">
+                        依据公式：<code>缺口 × 计发月数 ÷ 剩余月数</code>
+                        （以今天价格计）。
+                      </p>
+                    </div>
+
+                    {/* gentle urgency (one-year delay) */}
+                    {(() => {
+                      const monthsLeft = Math.max(
+                        1,
+                        (60 - Number(age || 0)) * 12
+                      );
+                      const later =
+                        (result.p3.gap * Number(annuityDivisor)) /
+                        Math.max(1, monthsLeft - 12);
+                      return (
+                        <p className="mt-2 text-[12px] text-[#8A3B3B]">
+                          若<strong>再晚一年</strong>开始，建议每年储蓄将从{" "}
+                          <strong>
+                            ¥{Math.round(result.p3.monthlySaving * 12)}
+                          </strong>{" "}
+                          提升至 <strong>¥{Math.round(later * 12)}</strong>。
+                        </p>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-xl bg-[#F5FFFB] p-4 text-[#1F6E52] text-[13px]">
+                    👍 已达到/超过目标，保持当前节奏即可。
+                  </div>
+                )}
+
+                {/* progress bar (compact) */}
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[13px] font-medium text-[#222]">
+                      差距进度
+                    </span>
+                  </div>
+                  <GapBar
+                    current={result.p1.total + result.p2.monthly}
+                    target={result.p3.targetReal}
+                    mode="percent"
+                  />
+                </div>
+              </div>
+
+              {/* 2) 同额月存：定存2.5% vs 组合6% */}
+              {result.p3.gap > 0 && (
+                <div className="rounded-2xl bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
+                  {(() => {
+                    const yearsLeft = Math.max(0, 60 - Number(age || 0));
+                    const pmt = Math.round(result.p3.monthlySaving);
+
+                    const payout2p5 = projectMonthlyPayout({
+                      monthlySaving: pmt,
+                      yearsToRetire: yearsLeft,
+                      realReturn: 0.025,
+                      annuityDivisor,
+                    });
+
+                    const payout6 = projectMonthlyPayout({
+                      monthlySaving: pmt,
+                      yearsToRetire: yearsLeft,
+                      realReturn: 0.06,
+                      annuityDivisor,
+                    });
+                    return (
+                      <>
+                        <p className="text-[15px] font-semibold text-[#111]">
+                          同样每月存 <strong>¥{pmt}</strong>
+                          ，退休时可领（今天价格）
+                        </p>
+                        <div className="mt-3 grid grid-cols-2 gap-3">
+                          <div className="rounded-xl bg-[#FAFAFA] p-4">
+                            <p className="text-[12px] text-[#8B8B8B]">
+                              定存（约 2.5%）
+                            </p>
+                            <p className="mt-1 text-[22px] font-bold text-[#222]">
+                              ≈ ¥{Math.round(payout2p5)}{" "}
+                              <span className="text-[12px] font-semibold">
+                                / 月
+                              </span>
+                            </p>
+                          </div>
+                          <div className="rounded-xl bg-[#FAFAFA] p-4">
+                            <p className="text-[12px] text-[#8B8B8B]">
+                              投资组合（约 6%）
+                            </p>
+                            <p className="mt-1 text-[22px] font-bold text-[#FF3B57]">
+                              ≈ ¥{Math.round(payout6)}{" "}
+                              <span className="text-[12px] font-semibold">
+                                / 月
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-[11px] text-[#9B9B9B]">
+                          教育演示：长期年化假设，非承诺；统一以今天价格计。
+                        </p>
+                      </>
+                    );
+                  })()}
+                </div>
               )}
 
-            <motion.div
-              className="mt-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-            >
-              <p className="text-sm">你退休后每月预计可领：</p>
-              <motion.p
-                className="text-3xl font-bold text-[#FF4D6A] mt-1"
-                animate={{ scale: [1, 1.06, 1] }}
-                transition={{ duration: 0.6 }}
-              >
-                {result.p1.total.toFixed(0)} 元 / 月
-              </motion.p>
-            </motion.div>
-
-            <GapHeatbar value={result.p3.gap} max={20000} />
-
-            <div className="mt-6 bg-[#FFF5F7] p-5 rounded-xl text-left">
-              <p className="text-sm">
-                要维持品质退休生活（约 {Number(targetReplacement).toFixed(0)}%
-                收入替代）
-              </p>
-
-              {result.p3.gap > 0 ? (
-                <>
-                  <p className="text-2xl font-bold text-[#FF4D6A] mt-2 text-center">
-                    还差 {result.p3.gap.toFixed(0)} 元 / 月
-                  </p>
-
-                  <p className="text-sm text-[#666] mt-4">我们帮你算好了：</p>
-                  <p className="text-lg font-semibold mt-1 text-center">
-                    每月存{" "}
-                    <span className="text-[#FF4D6A] font-bold">
-                      {result.p3.monthlySaving.toFixed(0)}
-                    </span>{" "}
-                    元就能补上差距
-                  </p>
-
-                  <button
-                    onClick={() => setShowTaxInfo(true)}
-                    className="text-sm text-[#FF4D6A] font-medium mt-3 underline underline-offset-4"
-                  >
-                    当年可少交税 ≈ {result.p3.taxSaving.toFixed(0)}{" "}
-                    元（怎么算？）
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="text-2xl font-bold text-[#666] mt-2 text-center">
-                    你已经达到理想退休水平
-                  </p>
-                  <p className="text-sm text-[#666] mt-4 text-center">
-                    继续保持现在的储蓄和社保缴纳即可。
-                  </p>
-                </>
+              {/* 3) 同样 6%：30/40/50 起投差别 */}
+              {result.p3.gap > 0 && (
+                <div className="rounded-2xl bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
+                  {(() => {
+                    const pmt = result.p3.monthlySaving;
+                    const rows = [30, 40, 50].map((sa) => {
+                      const years = Math.max(0, 60 - sa);
+                      const payout = projectMonthlyPayout({
+                        monthlySaving: pmt,
+                        yearsToRetire: years,
+                        realReturn: 0.06,
+                        annuityDivisor,
+                      });
+                      return { age: sa, years, payout };
+                    });
+                    return (
+                      <>
+                        <p className="text-[15px] font-semibold text-[#111]">
+                          同样按 6% 收益，不同起投年龄
+                        </p>
+                        <div className="mt-3 grid grid-cols-3 gap-3">
+                          {rows.map((r) => (
+                            <div
+                              key={r.age}
+                              className="rounded-xl bg-[#FAFAFA] p-4"
+                            >
+                              <p className="text-[12px] text-[#8B8B8B]">
+                                {r.age} 岁开始
+                              </p>
+                              <p className="mt-1 text-[18px] font-semibold text-[#222]">
+                                ≈ ¥{Math.round(r.payout)}
+                              </p>
+                              <p className="text-[11px] text-[#9B9B9B]">
+                                {r.years} 年复利
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-[11px] text-[#9B9B9B]">
+                          越早开始，同额月存换来的退休月领越高（演示口径）。
+                        </p>
+                      </>
+                    );
+                  })()}
+                </div>
               )}
-            </div>
 
-            <PathCompare
-              currentMonthly={currentMonthly}
-              targetMonthly={result.p3.targetReal}
-            />
+              {/* 4) 行动：养老 FOF */}
+              {result.p3.gap > 0 && (
+                <div className="rounded-2xl bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
+                  <p className="text-[15px] font-semibold text-[#111]">
+                    把计划落地（养老 FOF）
+                  </p>
+                  <p className="mt-2 text-[13px] text-[#444]">
+                    从<strong>本月</strong>开始，目标年度储蓄：
+                    <strong>
+                      {" "}
+                      ¥{Math.round(result.p3.monthlySaving * 12)}
+                    </strong>
+                    。 通过个人养老金账户定投<strong>养老目标（FOF）</strong>
+                    ，长期持有。 当年预计少交税 ≈{" "}
+                    <strong>¥{result.p3.taxSaving.toFixed(0)}</strong>。
+                  </p>
+                  <div className="mt-3 flex gap-8">
+                    <button
+                      onClick={() => setView("input")}
+                      className="rounded-full px-5 py-2 text-[14px] font-semibold text-white bg-[#FF3B57] shadow hover:opacity-95"
+                    >
+                      现在制定我的 FOF 计划
+                    </button>
+                    <button
+                      onClick={() => setView("input")}
+                      className="text-[14px] font-semibold text-[#333]"
+                    >
+                      修改参数
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
 
-            {/* Sticky CTA */}
-            <StickyCTA
+            {/* bottom safe area for sticky */}
+            <div className="h-28" />
+            {/* <StickyCTA
               visible
               saving={result.p3.monthlySaving || 0}
               tax={result.p3.taxSaving || 0}
               onClick={() => setView("input")}
-            />
+            /> */}
           </>
         )}
-
-        {/* ----- TAX MODAL ----- */}
-        <AnimatePresence>
-          {showTaxInfo && (
-            <motion.div
-              className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowTaxInfo(false)}
-            >
-              <motion.div
-                className="bg-white rounded-2xl p-6 w-[90%] max-w-[440px] text-left"
-                initial={{ y: 30, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 20, opacity: 0 }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="text-lg font-semibold">
-                  “少交税 ≈ XXX 元”怎么算？
-                </h3>
-                <ol className="mt-3 text-sm text-[#555] list-decimal pl-4 space-y-2">
-                  <li>
-                    假设你每月按<span className="font-medium">税延养老</span>
-                    或类似合规方式存入
-                    <span className="font-medium">可税前扣除</span>的金额。
-                  </li>
-                  <li>
-                    我们按<strong>年扣除限额 12,000 元</strong>
-                    进行估算（保守且通用）。
-                  </li>
-                  <li>
-                    省税 ≈ <code>min(月存×12, 12000) × 你的边际税率</code>。
-                  </li>
-                </ol>
-                <p className="text-xs text-[#9a9a9a] mt-3">
-                  注：这是简化示意，真实税负受收入结构/专项附加扣除/地方规则影响。
-                </p>
-                <button
-                  className="mt-4 w-full bg-[#FF4D6A] text-white py-2 rounded-full font-semibold"
-                  onClick={() => setShowTaxInfo(false)}
-                >
-                  明白了
-                </button>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );

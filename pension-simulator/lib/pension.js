@@ -5,6 +5,39 @@ const geomSumForward = (n, r) => (n<=0?0: Math.abs(r)<1e-9 ? n : ((1+r)**(n+1)-(
 const geomSumBackward = (n, r) => (n<=0?0: Math.abs(r)<1e-9 ? n : (1-(1+r)**(-n))/r); //pension discounting 
 const sumPow = (n, a) => (n<=0?0: Math.abs(a-1)<1e-9 ? n*a : (a*(1-a**n))/(1-a));
 
+/** Utility: get annuity divisor for a retirement age (default fallback 139) */
+export function getAnnuityDivisor(retirementAge = 60) {
+  return DIVISOR_MAP[Number(retirementAge)] ?? 139;
+}
+
+/**
+ * Scenario helper:
+ * Convert a constant real monthly saving until retirement into a
+ * retirement monthly payout (in today's prices) using your annuity divisor.
+ *
+ * FV_real = PMT * [((1+r_m)^n - 1) / r_m], r_m = realReturn / 12
+ * payout_monthly_real = FV_real / annuityDivisor
+ */
+
+export function projectMonthlyPayout({
+  monthlySaving,
+  yearsToRetire,
+  realReturn = 0.06,
+  annuityDivisor = 139,
+}) {
+  const pmt = Math.max(0, Number(monthlySaving) || 0);
+  const n   = Math.max(0, Math.round((Number(yearsToRetire) || 0) * 12));
+  if (pmt === 0 || n === 0) return 0;
+
+  const rm = Number(realReturn) / 12;
+  const fv =
+    Math.abs(rm) < 1e-9
+      ? pmt * n
+      : pmt * (((1 + rm) ** n - 1) / rm);
+
+  return fv / Math.max(1, Number(annuityDivisor) || 139);
+}
+
 /**
  * Pillar 1 = pooling + personal account 
  */

@@ -1,24 +1,22 @@
 // helpers
 const DIVISOR_MAP = { 60: 139, 55: 170, 50: 195 };
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
-const geomSumForward = (n, r) => (n<=0?0: Math.abs(r)<1e-9 ? n : ((1+r)**(n+1)-(1+r))/r);
-const geomSumBackward = (n, r) => (n<=0?0: Math.abs(r)<1e-9 ? n : (1-(1+r)**(-n))/r); //pension discounting 
-const sumPow = (n, a) => (n<=0?0: Math.abs(a-1)<1e-9 ? n*a : (a*(1-a**n))/(1-a));
+const geomSumForward = (n, r) =>
+  n <= 0 ? 0 : Math.abs(r) < 1e-9 ? n : ((1 + r) ** (n + 1) - (1 + r)) / r;
+const geomSumBackward = (n, r) =>
+  n <= 0 ? 0 : Math.abs(r) < 1e-9 ? n : (1 - (1 + r) ** -n) / r;
+const sumPow = (n, a) =>
+  n <= 0 ? 0 : Math.abs(a - 1) < 1e-9 ? n * a : (a * (1 - a ** n)) / (1 - a);
 
-/** Utility: get annuity divisor for a retirement age (default fallback 139) */
+/** Utility: get annuity divisor */
 export function getAnnuityDivisor(retirementAge = 60) {
   return DIVISOR_MAP[Number(retirementAge)] ?? 139;
 }
 
 /**
- * Scenario helper:
- * Convert a constant real monthly saving until retirement into a
- * retirement monthly payout (in today's prices) using your annuity divisor.
- *
- * FV_real = PMT * [((1+r_m)^n - 1) / r_m], r_m = realReturn / 12
- * payout_monthly_real = FV_real / annuityDivisor
+ * Scenario:
+ * Convert constant real saving → future payout (in today's prices)
  */
-
 export function projectMonthlyPayout({
   monthlySaving,
   yearsToRetire,
@@ -26,127 +24,161 @@ export function projectMonthlyPayout({
   annuityDivisor = 139,
 }) {
   const pmt = Math.max(0, Number(monthlySaving) || 0);
-  const n   = Math.max(0, Math.round((Number(yearsToRetire) || 0) * 12));
+  const n = Math.max(0, Math.round((Number(yearsToRetire) || 0) * 12));
   if (pmt === 0 || n === 0) return 0;
 
   const rm = Number(realReturn) / 12;
   const fv =
-    Math.abs(rm) < 1e-9
-      ? pmt * n
-      : pmt * (((1 + rm) ** n - 1) / rm);
+    Math.abs(rm) < 1e-9 ? pmt * n : pmt * (((1 + rm) ** n - 1) / rm);
 
   return fv / Math.max(1, Number(annuityDivisor) || 139);
 }
 
 /**
- * Pillar 1 = pooling + personal account 
+ * Pillar 1 = 基础养老金 pooling + 个人账户
+ *
+ * 🚨 FIX: We now use ONLY past years (NO future accrual)
  */
-// Pooling Calculation (original formula already adjusted for wage increment)
+
+// Pooling Calculation (use only pastYears)
 function pillar1PoolingToday({ monthlyWage, socialAvgMonthly, yearsTotal }) {
-  // payindex but camp to be bewteen 0.6 - 3.0 
   const payIndex = clamp(
     Number(monthlyWage) / Math.max(1e-9, Number(socialAvgMonthly)),
-    0.6, 3.0
+    0.6,
+    3.0
   );
-  // official rule for calculating pooling 
   const sa = Number(socialAvgMonthly) || 0;
   return ((payIndex * sa + sa) / 2) * (Math.max(0, yearsTotal) * 0.01);
 }
 
-// Personal Account Calculation 
+// Personal Account: FIX → only past, no future
 function personalAccountMonthlyToday({
-  monthlyWage, yearsWorked, yearsToRetire, g_w = 0.0, credit_rate = 0.0, divisor
+  monthlyWage,
+  yearsWorked,
+  g_w = 0.0,
+  credit_rate = 0.0,
+  divisor,
 }) {
   const wage0 = Number(monthlyWage) || 0;
   const Yp = Math.max(0, Number(yearsWorked) || 0);
-  const Yf = Math.max(0, Number(yearsToRetire) || 0);
-  // contribution to personal from wage is 8%
-  const base = wage0 * 0.08 * 12;
 
-  // case for no investment return 
+  const base = wage0 * 0.08 * 12; // personal account yearly contribution
+
+  // No future contributions
   if (Math.abs(credit_rate) < 1e-9) {
-    const past   = base * geomSumBackward(Yp, g_w);
-    const future = base * geomSumForward(Yf, g_w);
-    return (past + future) / divisor;
+    const past = base * geomSumBackward(Yp, g_w);
+    return past / divisor;
   }
 
-  // with real crediting
+  // If crediting is used (rare)
   const aPast = (1 + credit_rate) / (1 + g_w);
-  const aFut  = (1 + g_w) / (1 + credit_rate);
-  const pastGrown   = base * (1 + credit_rate) ** Math.max(0, Yf - 1) * sumPow(Yp, aPast);
-  const futureGrown = base * (1 + credit_rate) ** Yf * sumPow(Yf, aFut);
-  // official formula for calculating personal account amount, divisor also official
-  return (pastGrown + futureGrown) / divisor;
+  const pastGrown =
+    base *
+    (1 + credit_rate) ** 0 * // no future years => exponent simplified
+    sumPow(Yp, aPast);
+
+  return pastGrown / divisor;
 }
 
 /**
- * Pillar 2 Calculation 
+ * Pillar 2 (企业年金)
+ * 🚨 FIX: We now calculate using ONLY past contributions
  */
 function pillar2MonthlyToday({
-  monthlyWage, yearsWorked, yearsToRetire, pillar2Level, retirementAge, g_w = 0.0, credit_rate = 0.0
+  monthlyWage,
+  yearsWorked,
+  pillar2Level,
+  retirementAge,
+  g_w = 0.0,
+  credit_rate = 0.0,
 }) {
-  // Determine contribution rate (annual)
-  const rateMap = { none: 0.0, basic: 0.03, standard: 0.06, generous: 0.10 };
+  const rateMap = { none: 0.0, basic: 0.03, standard: 0.06, generous: 0.1 };
   const rate = rateMap[pillar2Level] ?? 0.0;
   const divisor = DIVISOR_MAP[retirementAge] ?? 139;
 
   const wage0 = Number(monthlyWage) || 0;
   const Yp = Math.max(0, Number(yearsWorked) || 0);
-  const Yf = Math.max(0, Number(yearsToRetire) || 0);
   const base = wage0 * rate * 12;
 
-  // case for no investment return 
+  // no future contribution
   if (Math.abs(credit_rate) < 1e-9) {
-    const past   = base * geomSumBackward(Yp, g_w);
-    const future = base * geomSumForward(Yf, g_w);
-    return (past + future) / divisor;
+    const past = base * geomSumBackward(Yp, g_w);
+    return past / divisor;
   }
 
-  // case for with investment return 
   const aPast = (1 + credit_rate) / (1 + g_w);
-  const aFut  = (1 + g_w) / (1 + credit_rate);
-  const pastGrown   = base * (1 + credit_rate) ** Math.max(0, Yf - 1) * sumPow(Yp, aPast);
-  const futureGrown = base * (1 + credit_rate) ** Yf * sumPow(Yf, aFut);
-  return (pastGrown + futureGrown) / divisor;
+  const pastGrown = base * sumPow(Yp, aPast);
+
+  return pastGrown / divisor;
 }
 
-// ===== Public APIs (note the new final options arg) =====
+/** ===============================
+ *   Public API (exports)
+ *  ===============================
+ */
+
+// Pillar 1: past-only
 export function computePillar1(
-  monthlyWage, socialAvgMonthly, yearsWorked, age, retirementAge,
+  monthlyWage,
+  socialAvgMonthly,
+  yearsWorked,
+  _age,            // unused in past-only version
+  retirementAge,
   { g_w = 0.0, credit_rate = 0.0 } = {}
 ) {
-  const pastYears     = Math.max(0, Number(yearsWorked) || 0);
-  const yearsToRetire = Math.max(0, (retirementAge || 60) - (age || 0));
-  const yearsTotal    = pastYears + yearsToRetire;
-  const divisor       = DIVISOR_MAP[retirementAge] ?? 139;
+  const pastYears = Math.max(0, Number(yearsWorked) || 0);
+  const divisor = DIVISOR_MAP[retirementAge] ?? 139;
 
-  const pooling = pillar1PoolingToday({ monthlyWage, socialAvgMonthly, yearsTotal });
-  const individual = personalAccountMonthlyToday({
-    monthlyWage, yearsWorked: pastYears, yearsToRetire, g_w, credit_rate, divisor
+  const pooling = pillar1PoolingToday({
+    monthlyWage,
+    socialAvgMonthly,
+    yearsTotal: pastYears, // ONLY past years
   });
-  return { pooling, individual, total: pooling + individual, years_past: pastYears, years_total: yearsTotal };
+
+  const individual = personalAccountMonthlyToday({
+    monthlyWage,
+    yearsWorked: pastYears,
+    g_w,
+    credit_rate,
+    divisor,
+  });
+
+  return {
+    pooling,
+    individual,
+    total: individual,
+    years_past: pastYears,
+    years_total: pastYears,
+  };
 }
 
+// Pillar 2: past-only
 export function computePillar2(
-  monthlyWage, _socialAvgMonthly, yearsWorked, age, retirementAge, pillar2Level,
+  monthlyWage,
+  _socialAvgMonthly,
+  yearsWorked,
+  _age, // unused now
+  retirementAge,
+  pillar2Level,
   { g_w = 0.0, credit_rate = 0.0 } = {}
 ) {
-  const yearsToRetire = Math.max(0, (retirementAge || 60) - (age || 0));
-  const divisor       = DIVISOR_MAP[retirementAge] ?? 139;
+  const pastYears = Math.max(0, Number(yearsWorked) || 0);
 
   const monthly = pillar2MonthlyToday({
-    monthlyWage, yearsWorked, yearsToRetire, pillar2Level, retirementAge, g_w, credit_rate
+    monthlyWage,
+    yearsWorked: pastYears,
+    pillar2Level,
+    retirementAge,
+    g_w,
+    credit_rate,
   });
+
+  const divisor = DIVISOR_MAP[retirementAge] ?? 139;
   return { monthly, balance: monthly * divisor };
 }
 
 /**
- * 第三支柱缺口 & 月存额（Semi Model, 折回今天价格）
- *  options:
- *   - g_w  工资年增长率 (ex: 0.03)
- *   - inf  年通胀率 (ex: 0.0225)
- *   - targetReplacement 替代率 (ex: 0.70)
- *   - annuityDivisor 退休后折算除数 (ex: 139)
+ * Pillar 3 gap: unchanged
  */
 export function computePillar3Gap(
   monthlyWage,
@@ -163,20 +195,19 @@ export function computePillar3Gap(
 ) {
   const yearsToRetire = Math.max(0, retirementAge - age);
 
-  // Step 1: 退休前最后工资(Nominal)
+  // Step 1: future nominal wage
   const futureWage = monthlyWage * Math.pow(1 + g_w, yearsToRetire);
 
-  // Step 2: 退休时目标收入（名义）
+  // Step 2: target nominal income at retirement
   const targetNominal = futureWage * targetReplacement;
 
-  // Step 3: 折现回今天的购买力
+  // Step 3: discount to today
   const targetReal = targetNominal / Math.pow(1 + inf, yearsToRetire);
 
   const existingReal = pillar1TotalMonthly + pillar2Monthly;
 
   const gap = Math.max(0, targetReal - existingReal);
 
-  // Step 4: 月存额（Real）
   const monthsToRetire = Math.max(1, yearsToRetire * 12);
   const monthlySaving = (gap * annuityDivisor) / monthsToRetire;
 

@@ -5,7 +5,8 @@ import {
   computePillar1,
   computePillar2,
   computePillar3Gap,
-  projectMonthlyPayout,
+  getAnnuityDivisor,
+  projectMonthlyPayout
 } from "@/lib/pension";
 import wageData from "./wage.json";
 import didYouKnowData from "./didYouKnow.json";
@@ -299,37 +300,56 @@ export default function Home() {
   function doCalc() {
     if (!monthlyWage || !age || !yearsWorked) return;
 
-    const gw = Number(wageGrowth) / 100;
-    // const cr = Number(preRetRealReturn) / 100 || 0; // reserved if adding crediting
+    const wage = Number(monthlyWage);
+    const ageNum = Number(age);
+    const years = Number(yearsWorked);
 
-    const p1 = computePillar1(
-      Number(monthlyWage),
-      socialAvg,
-      Number(yearsWorked),
-      Number(age),
-      retirementAge
-    );
+    const gw = Number(wageGrowth) / 100; // 工资增速 g_w
+    const inf = Number(inflation) / 100; // 通胀
+    const targetRep = Number(targetReplacement) / 100;
+    const divisor = Number(annuityDivisor) || 139;
 
+    // 如果你有“退休前预期收益率”之类的输入，可以用它当作 credit_rate
+    // 否则就让它走默认值（在 lib 里是 0.0275）
+    const creditRate =
+      preRetRealReturn !== undefined && preRetRealReturn !== null
+        ? Number(preRetRealReturn) / 100
+        : undefined;
+
+    // --- Pillar 1: 基础养老金 + 个人账户（过去 + 未来） ---
+    const p1 = computePillar1(wage, socialAvg, years, ageNum, retirementAge, {
+      g_w: gw,
+      inf,
+      ...(creditRate !== undefined ? { credit_rate: creditRate } : {}),
+    });
+
+    // --- Pillar 2: 企业年金（过去 + 未来） ---
     const p2 = computePillar2(
-      Number(monthlyWage),
+      wage,
       socialAvg,
-      Number(yearsWorked),
-      Number(age),
+      years,
+      ageNum,
       retirementAge,
-      pillar2Level
-    );
-
-    const gapObj = computePillar3Gap(
-      Number(monthlyWage),
-      Number(age),
-      retirementAge,
-      p1.total,
-      p2.monthly,
+      pillar2Level,
       {
         g_w: gw,
-        inf: Number(inflation) / 100,
-        targetReplacement: Number(targetReplacement) / 100,
-        annuityDivisor: Number(annuityDivisor),
+        inf,
+        ...(creditRate !== undefined ? { credit_rate: creditRate } : {}),
+      }
+    );
+
+    // --- Pillar 3: 缺口 + 建议每月储蓄 ---
+    const gapObj = computePillar3Gap(
+      wage,
+      ageNum,
+      retirementAge,
+      p1.total, // 已经是“今天价格”的月养老金
+      p2.monthly, // 同上
+      {
+        g_w: gw,
+        inf,
+        targetReplacement: targetRep,
+        annuityDivisor: divisor,
       }
     );
 

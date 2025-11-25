@@ -14,6 +14,9 @@ import DidYouKnowCarousel from "@/components/UI/DidYouKnowCarousel";
 import AppleBarCompare from "@/components/Charts/AppleBarCompare";
 import GapBar from "@/components/UI/GapBar";
 import EarlyStartBarChart from "@/components/Charts/EarlyStartBarChart";
+import TooltipModal from "@/components/UI/TooltipModal";
+import TaxBenefitChart from "@/components/Charts/TaxBenefitChart";
+import NextStepGuide from "@/components/UI/NextStepGuide";
 
 // ---------------------- Utils & Data ----------------------
 const PROVINCES = wageData.map((d) => d.province);
@@ -139,54 +142,51 @@ export default function Home() {
     setView("result");
   }
 
-  const currentMonthly = (result?.p1?.total || 0) + (result?.p2?.monthly || 0);
-  const kpiColor = (ok) => (ok ? "text-[#2A7259]" : "text-[#0092f9]");
+  const DEMO_CONTRIBUTION = 1000; // 每月示例储蓄金额
 
-  // ---- Compute payout comparisons ----
-  let payout2p5 = 0;
-  let payout6 = 0;
-  let payout30 = 0;
-  let payout40 = 0;
-  let payout50 = 0;
+  let early30 = 0;
+  let early40 = 0;
+  let early50 = 0;
+  let rate25 = 0;
+  let rate6 = 0;
 
   if (view === "result" && result) {
-    const monthlySaving = result?.p3?.monthlySaving || 0;
-    const ageNum = Number(age);
-    const yearsLeft = Math.max(0, retirementAge - ageNum);
+    // 当前用户年龄与退休年龄
+    const yearsLeft = Math.max(0, retirementAge - Number(age));
 
-    // A. 收益率对比（2.5% vs 6%）
-    payout2p5 = projectMonthlyPayout({
-      monthlySaving,
+    // A. 收益率差异（定存 vs 组合）
+    rate25 = projectMonthlyPayout({
+      monthlySaving: DEMO_CONTRIBUTION,
       yearsToRetire: yearsLeft,
       realReturn: 0.025,
       annuityDivisor,
     });
 
-    payout6 = projectMonthlyPayout({
-      monthlySaving,
+    rate6 = projectMonthlyPayout({
+      monthlySaving: DEMO_CONTRIBUTION,
       yearsToRetire: yearsLeft,
       realReturn: 0.06,
       annuityDivisor,
     });
 
-    // B. 不同起投年龄（30 / 40 / 50）
-    payout30 = projectMonthlyPayout({
-      monthlySaving,
-      yearsToRetire: Math.max(0, retirementAge - 30),
+    // B. 不同起投年龄
+    early30 = projectMonthlyPayout({
+      monthlySaving: DEMO_CONTRIBUTION,
+      yearsToRetire: retirementAge - 30,
       realReturn: 0.06,
       annuityDivisor,
     });
 
-    payout40 = projectMonthlyPayout({
-      monthlySaving,
-      yearsToRetire: Math.max(0, retirementAge - 40),
+    early40 = projectMonthlyPayout({
+      monthlySaving: DEMO_CONTRIBUTION,
+      yearsToRetire: retirementAge - 40,
       realReturn: 0.06,
       annuityDivisor,
     });
 
-    payout50 = projectMonthlyPayout({
-      monthlySaving,
-      yearsToRetire: Math.max(0, retirementAge - 50),
+    early50 = projectMonthlyPayout({
+      monthlySaving: DEMO_CONTRIBUTION,
+      yearsToRetire: retirementAge - 50,
       realReturn: 0.06,
       annuityDivisor,
     });
@@ -358,7 +358,8 @@ export default function Home() {
 
                   <div className="flex justify-between items-center px-3 py-3 border-b border-[#F3F3F3]">
                     <span className="text-sm text-[#333]">
-                      退休折算除数（计发月数）
+                      退休折算除数(计发月数)
+                      <TooltipModal type="annuity" />
                     </span>
                     <input
                       type="number"
@@ -414,7 +415,7 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <div className="flex justify-between items-center px-3 py-3">
+                  {/* <div className="flex justify-between items-center px-3 py-3">
                     <span className="text-sm text-[#333]">边际税率(%)</span>
                     <input
                       type="number"
@@ -422,7 +423,7 @@ export default function Home() {
                       value={taxRate}
                       onChange={(e) => setTaxRate(Number(e.target.value))}
                     />
-                  </div>
+                  </div> */}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -447,13 +448,25 @@ export default function Home() {
         {view === "result" && result && (
           <>
             <section className="mt-8 text-left space-y-6">
-              {/* 1) 误区提醒 ———— Awareness Tip */}
-              <div className="rounded-xl bg-[#0092f9]/10 border border-[#0092f9] p-4">
-                <p className="text-[14px] font-medium text-[#21292e]">
-                  很多人以为“有社保就够了”，但实际替代率只有约 40%。
+              <div className="relative rounded-2xl border border-[#0092f9]/10 bg-[#F9FBFF] p-4 shadow-sm">
+                <div
+                  className="absolute -top-2 left-4 bg-[#0092f9]/5 text-[#0092f9] 
+       text-[11px] px-2 py-0.5 rounded-full font-medium shadow"
+                >
+                  提醒
+                </div>
+
+                <p className="text-[14px] font-semibold text-[#1A2B4A] leading-relaxed pt-2">
+                  很多人以为“退休的事以后再说”，或觉得“有社保就够了”。
                 </p>
-                <p className="mt-1 text-[13px] text-[#21292e] leading-relaxed">
-                  我们先用你的信息看看，你真正能领到的退休金是多少。
+
+                <p className="mt-2 text-[13px] text-[#3B4D6A] leading-relaxed">
+                  但真正决定你未来生活质量的，是你以为能领到的金额，
+                  和你实际能领到的金额之间的差距。
+                </p>
+
+                <p className="mt-2 text-[13px] text-[#3B4D6A] leading-relaxed">
+                  我们先根据你的情况快速测算，看看你60岁时的“真实数字”是多少。
                 </p>
               </div>
 
@@ -471,13 +484,15 @@ export default function Home() {
                       <span className="text-[14px] font-semibold">/ 月</span>
                     </p>
                     <p className="mt-1 text-[12px] text-[#9B9B9B]">
-                      （第一支柱 + 第二支柱）
+                      (第一支柱 + 第二支柱)
+                      <TooltipModal type="pillar1n2" />
                     </p>
                   </div>
 
                   <div className="rounded-xl bg-[#FAFAFA] p-4">
                     <p className="text-[12px] text-[#8B8B8B]">
-                      目标（{Number(targetReplacement)}% 收入替代率）
+                      目标({Number(targetReplacement)}% 收入替代率)
+                      <TooltipModal type="replacement" />
                     </p>
                     <p className="mt-1 text-[28px] leading-none font-extrabold text-[#222]">
                       ¥{Math.round(result.p3.targetReal)}
@@ -503,17 +518,16 @@ export default function Home() {
                 <h3 className="text-[15px] font-semibold text-[#111] mb-2">
                   为什么会有这么大的差距？
                 </h3>
-                <ul className="text-[13px] text-[#444] leading-relaxed space-y-2 pl-4 list-disc">
-                  <li>第一支柱替代率不断下降（约 40%）。</li>
-                  <li>工资涨幅 ≠ 养老金账户涨幅，个人账户积累较慢。</li>
-                  <li>很多人低估了退休时维持生活所需的费用水平。</li>
-                </ul>
+                <div className="rounded-xl text-[13px] text-[#444] leading-relaxed">
+                  退休金之所以不够，是因为我们想象中的收入曲线和养老金的积累方式并不一致。职场中工资增长快，消费水平也不断提高，但社保养老金属于基础保障，个人账户和企业年金的积累速度都比较慢。再加上大多数年轻人低估了退休后的生活成本，自然会形成一段让人意外的差距。
+                </div>
               </div>
 
               {/* 4) 第三支柱缺口 ———— Core Gap Section */}
               <div className="rounded-2xl bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
                 <h2 className="text-[15px] font-semibold text-[#111]">
                   你的第三支柱缺口
+                  <TooltipModal type="pillar3" />
                 </h2>
 
                 {result.p3.gap > 0 ? (
@@ -555,72 +569,46 @@ export default function Home() {
                   为什么“越早开始越轻松”？
                 </h3>
 
-                {/* A. 2.5% vs 6% 微型条形图 */}
+                <p className="text-[12px] text-[#999] mb-2">
+                  以每月储蓄 <strong>¥1,000</strong>{" "}
+                  为例，在退休时你每月可领取的金额如下：
+                </p>
+
+                {/* A. 定存 vs 投资 */}
                 <AppleBarCompare
                   leftLabel="定存（约 2.5%）"
                   rightLabel="投资组合（约 6%）"
-                  leftValue={payout2p5}
-                  rightValue={payout6}
+                  leftValue={rate25}
+                  rightValue={rate6}
                 />
 
                 <p className="mt-2 text-[12px] text-[#999]">
-                  同样月存，长期收益差距显著（以今天购买力计）。
+                  收益率越高，复利越强，未来退休时每月可领取的金额差距显著。
                 </p>
 
-                {/* Divider */}
                 <div className="my-4 h-px bg-[#F0F0F0]" />
 
-                {/* B. 起投年龄微型折线图 */}
                 <p className="text-[13px] font-medium text-[#111]">
-                  提前 10 年开始，差距会变成这样：
+                  若每月储蓄相同，不同年龄开始，退休时月领金额如下：
                 </p>
 
                 <EarlyStartBarChart
                   points={[
-                    { label: "30岁", value: payout30 },
-                    { label: "40岁", value: payout40 },
-                    { label: "50岁", value: payout50 },
+                    { label: "30岁", value: early30 },
+                    { label: "40岁", value: early40 },
+                    { label: "50岁", value: early50 },
                   ]}
                 />
 
                 <p className="mt-2 text-[12px] text-[#999] leading-relaxed">
                   越早开始，复利作用越强。相比 30 岁启动，50
-                  岁开始的退休可领金额可能仅剩
-                  <strong> {Math.round((payout50 / payout30) * 100)}%</strong>。
+                  岁开始的退休月领金额可能仅为其
+                  <strong> {Math.round((early50 / early30) * 100)}%</strong>。
                 </p>
               </div>
+              <TaxBenefitChart userRate={taxRate} />
 
-              {/* 6) 行动：FOF ———— Strong CTA */}
-              {result.p3.gap > 0 && (
-                <div className="rounded-2xl bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
-                  <h3 className="text-[15px] font-semibold text-[#111]">
-                    我现在应该怎么做？
-                  </h3>
-                  <p className="mt-2 text-[13px] text-[#444] leading-relaxed">
-                    你的缺口可以通过长期定投
-                    <strong> 个人养老金账户 + 养老目标 FOF </strong>
-                    来逐步补齐。 当年可省税约：{" "}
-                    <strong>¥{result.p3.taxSaving.toFixed(0)}</strong>。
-                  </p>
-
-                  <button
-                    onClick={() => {
-                      window.location.href = "https://www.cifm.com/";
-                    }}
-                    className="mt-4 rounded-full px-5 py-2 text-[14px] font-semibold text-white bg-[#0092f9]
-                    ] shadow hover:opacity-95"
-                  >
-                    开始了解基金产品
-                  </button>
-
-                  <button
-                    onClick={() => setView("input")}
-                    className="mt-3 text-[14px] font-semibold text-[#333] ml-4"
-                  >
-                    修改参数
-                  </button>
-                </div>
-              )}
+              <NextStepGuide />
 
               {/* 7) 收尾文案 */}
               <p className="text-center text-[12px] text-[#999] mt-6">

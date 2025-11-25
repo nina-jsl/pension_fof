@@ -22,7 +22,7 @@ export default function DidYouKnowCarousel({ items = [] }) {
   return (
     <div className="mt-5 rounded-xl border border-[#EEE] bg-white p-4 text-left shadow-sm">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium tracking-wide text-[#FF4D6A]">
+        <span className="text-xs font-medium tracking-wide text-[#0092f9]">
           你知道吗？
         </span>
         <div className="flex gap-1">
@@ -30,7 +30,7 @@ export default function DidYouKnowCarousel({ items = [] }) {
             <span
               key={i}
               className={`h-1.5 w-1.5 rounded-full ${
-                i === idx ? "bg-[#FF4D6A]" : "bg-[#E6E6E6]"
+                i === idx ? "bg-[#0092f9]" : "bg-[#E6E6E6]"
               }`}
             />
           ))}

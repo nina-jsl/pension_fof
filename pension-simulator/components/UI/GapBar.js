@@ -25,7 +25,7 @@ export default function GapBar({ current = 0, target = 0, mode = "amount" }) {
         onMouseLeave={() => setHover(false)}
       >
         <motion.div
-          className="h-full bg-gradient-to-r from-[#FF9AAE] to-[#FF4D6A]"
+          className="h-full bg-gradient-to-r from-[#90c4ff] to-[#0092f9]"
           initial={{ width: 0 }}
           animate={{ width: `${pct * 100}%` }}
           transition={{ duration: 0.6 }}

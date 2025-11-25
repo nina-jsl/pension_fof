@@ -31,7 +31,7 @@ export default function EarlyStartBarChart({ points }) {
               {/* 固定高度 24 的灰色柱子，内部用百分比填充 */}
               <div className="w-4 h-24 rounded-full bg-neutral-100 flex items-end overflow-hidden">
                 <div
-                  className="w-full rounded-full bg-[#6E73F9]"
+                  className="w-full rounded-full bg-[#6f44bb]"
                   style={{ height: `${heightPct}%` }}
                 />
               </div>

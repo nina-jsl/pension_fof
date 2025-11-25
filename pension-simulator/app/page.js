@@ -140,7 +140,7 @@ export default function Home() {
   }
 
   const currentMonthly = (result?.p1?.total || 0) + (result?.p2?.monthly || 0);
-  const kpiColor = (ok) => (ok ? "text-[#2A7259]" : "text-[#FF4D6A]");
+  const kpiColor = (ok) => (ok ? "text-[#2A7259]" : "text-[#0092f9]");
 
   // ---- Compute payout comparisons ----
   let payout2p5 = 0;
@@ -200,16 +200,6 @@ export default function Home() {
           <>
             <DidYouKnowCarousel items={didYouKnow} />
 
-            <p className="mt-2 text-[12px] text-[#666]">
-              个人养老金（第三支柱）：税优账户、长期复利、专为退休。
-              {/* <button
-                onClick={() => setShowMethod(true)}
-                className="ml-1 underline underline-offset-2 text-[#FF4D6A]"
-              >
-                了解详情
-              </button> */}
-            </p>
-
             <h1 className="text-xl font-semibold mt-6">
               60岁的你，会过怎样的生活？
             </h1>
@@ -220,7 +210,7 @@ export default function Home() {
             <div className="mt-8">
               <button
                 onClick={() => setView("input")}
-                className="w-full bg-[#FF4D6A] text-white py-3 rounded-full font-semibold hover:opacity-95 transition"
+                className="w-full bg-[#0092f9] text-white py-3 rounded-full font-semibold hover:opacity-95 transition"
               >
                 来算算你的未来的养老金
               </button>
@@ -287,21 +277,21 @@ export default function Home() {
             </select>
 
             <input
-              className="w-full border border-[#E5E5E5] rounded-lg px-4 py-3 text-left text-[15px] focus:outline-none focus:ring-1 focus:ring-[#FF4D6A]"
+              className="w-full border border-[#E5E5E5] rounded-lg px-4 py-3 text-left text-[15px] focus:outline-none focus:ring-1 focus:ring-[#0092f9]"
               placeholder="月薪（元）"
               value={monthlyWage}
               onChange={(e) => setMonthlyWage(e.target.value)}
             />
 
             <input
-              className="w-full border border-[#E5E5E5] rounded-lg px-4 py-3 text-left text-[15px] focus:outline-none focus:ring-1 focus:ring-[#FF4D6A]"
+              className="w-full border border-[#E5E5E5] rounded-lg px-4 py-3 text-left text-[15px] focus:outline-none focus:ring-1 focus:ring-[#0092f9]"
               placeholder="年龄"
               value={age}
               onChange={(e) => setAge(e.target.value)}
             />
 
             <input
-              className="w-full border border-[#E5E5E5] rounded-lg px-4 py-3 text-left text-[15px] focus:outline-none focus:ring-1 focus:ring-[#FF4D6A]"
+              className="w-full border border-[#E5E5E5] rounded-lg px-4 py-3 text-left text-[15px] focus:outline-none focus:ring-1 focus:ring-[#0092f9]"
               placeholder="你已经工作了多久（年）"
               value={yearsWorked}
               onChange={(e) => setYearsWorked(e.target.value)}
@@ -417,7 +407,7 @@ export default function Home() {
                       onChange={(e) =>
                         setTargetReplacement(Number(e.target.value))
                       }
-                      className="w-full accent-[#FF4D6A]"
+                      className="w-full accent-[#0092f9]"
                     />
                     <p className="text-[11px] text-[#999] mt-1">
                       70%为世界银行建议标准，可上调以追求更高品质生活。
@@ -445,7 +435,7 @@ export default function Home() {
                 返回
               </button>
               <button
-                className="w-full bg-[#FF4D6A] text-white py-3 rounded-full font-semibold hover:opacity-95 transition"
+                className="w-full bg-[#0092f9] text-white py-3 rounded-full font-semibold hover:opacity-95 transition"
                 onClick={doCalc}
               >
                 查看计算结果
@@ -458,11 +448,11 @@ export default function Home() {
           <>
             <section className="mt-8 text-left space-y-6">
               {/* 1) 误区提醒 ———— Awareness Tip */}
-              <div className="rounded-xl bg-[#FFF7E8] border border-[#FFE1B3] p-4">
-                <p className="text-[14px] font-medium text-[#A66A00]">
+              <div className="rounded-xl bg-[#0092f9]/10 border border-[#0092f9] p-4">
+                <p className="text-[14px] font-medium text-[#21292e]">
                   很多人以为“有社保就够了”，但实际替代率只有约 40%。
                 </p>
-                <p className="mt-1 text-[13px] text-[#A66A00] leading-relaxed">
+                <p className="mt-1 text-[13px] text-[#21292e] leading-relaxed">
                   我们先用你的信息看看，你真正能领到的退休金是多少。
                 </p>
               </div>
@@ -529,26 +519,26 @@ export default function Home() {
                 {result.p3.gap > 0 ? (
                   <>
                     <div className="mt-3">
-                      <p className="text-[12px] text-[#8A3B3B]">
+                      <p className="text-[12px] text-[#21292e]">
                         退休后每月还差
                       </p>
-                      <p className="text-[26px] font-bold text-[#C03737] leading-tight">
+                      <p className="text-[26px] font-bold text-[#0092f9] leading-tight">
                         ¥{Math.round(result.p3.gap)}
                         <span className="text-[13px] font-semibold">/ 月</span>
                       </p>
                     </div>
 
                     <div className="mt-3">
-                      <p className="text-[12px] text-[#8A3B3B]">
+                      <p className="text-[12px] text-[#21292e]">
                         若现在开始，应每月储蓄
                       </p>
-                      <p className="text-[22px] font-bold text-[#B22525]">
+                      <p className="text-[22px] font-bold text-[#0092f9]">
                         ¥{Math.round(result.p3.monthlySaving)}
                         <span className="text-[13px] font-semibold">/ 月</span>
                       </p>
                     </div>
 
-                    <p className="mt-2 text-[12px] text-[#A66A00]">
+                    <p className="mt-2 text-[12px] text-[#00458a]">
                       再晚一年开始，你需要的年储蓄将增加明显。
                     </p>
                   </>
@@ -615,7 +605,8 @@ export default function Home() {
 
                   <button
                     onClick={() => setView("input")}
-                    className="mt-4 rounded-full px-5 py-2 text-[14px] font-semibold text-white bg-[#FF4D6A] shadow hover:opacity-95"
+                    className="mt-4 rounded-full px-5 py-2 text-[14px] font-semibold text-white bg-[#0092f9]
+                    ] shadow hover:opacity-95"
                   >
                     开始了解基金产品
                   </button>

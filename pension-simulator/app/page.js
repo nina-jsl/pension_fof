@@ -448,13 +448,25 @@ export default function Home() {
         {view === "result" && result && (
           <>
             <section className="mt-8 text-left space-y-6">
-              {/* 1) 误区提醒 ———— Awareness Tip */}
-              <div className="rounded-xl bg-[#0092f9]/10 border border-[#0092f9] p-4">
-                <p className="text-[14px] font-medium text-[#21292e]">
-                  很多人以为“有社保就够了”，但实际替代率只有约 40%。
+              <div className="relative rounded-2xl border border-[#0092f9]/10 bg-[#F9FBFF] p-4 shadow-sm">
+                <div
+                  className="absolute -top-2 left-4 bg-[#0092f9]/5 text-[#0092f9] 
+       text-[11px] px-2 py-0.5 rounded-full font-medium shadow"
+                >
+                  提醒
+                </div>
+
+                <p className="text-[14px] font-semibold text-[#1A2B4A] leading-relaxed pt-2">
+                  很多人以为“退休的事以后再说”，或觉得“有社保就够了”。
                 </p>
-                <p className="mt-1 text-[13px] text-[#21292e] leading-relaxed">
-                  我们先用你的信息看看，你真正能领到的退休金是多少。
+
+                <p className="mt-2 text-[13px] text-[#3B4D6A] leading-relaxed">
+                  但真正决定你未来生活质量的，是你以为能领到的金额，
+                  和你实际能领到的金额之间的差距。
+                </p>
+
+                <p className="mt-2 text-[13px] text-[#3B4D6A] leading-relaxed">
+                  我们先根据你的情况快速测算，看看你60岁时的“真实数字”是多少。
                 </p>
               </div>
 
@@ -596,8 +608,8 @@ export default function Home() {
               </div>
               <TaxBenefitChart userRate={taxRate} />
 
-              <NextStepGuide/>
-      
+              <NextStepGuide />
+
               {/* 7) 收尾文案 */}
               <p className="text-center text-[12px] text-[#999] mt-6">
                 退休是一场马拉松，只要现在开始，你就已经领先大多数人。

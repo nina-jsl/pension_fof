@@ -513,16 +513,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* 3) 为什么会差这么多 ———— Misperception Fix */}
-              <div className="rounded-xl bg-white border border-[#EEE] p-5">
-                <h3 className="text-[15px] font-semibold text-[#111] mb-2">
-                  为什么会有这么大的差距？
-                </h3>
-                <div className="rounded-xl text-[13px] text-[#444] leading-relaxed">
-                  退休金之所以不够，是因为我们想象中的收入曲线和养老金的积累方式并不一致。职场中工资增长快，消费水平也不断提高，但社保养老金属于基础保障，个人账户和企业年金的积累速度都比较慢。再加上大多数年轻人低估了退休后的生活成本，自然会形成一段让人意外的差距。
-                </div>
-              </div>
-
               {/* 4) 第三支柱缺口 ———— Core Gap Section */}
               <div className="rounded-2xl bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
                 <h2 className="text-[15px] font-semibold text-[#111]">
@@ -561,6 +551,16 @@ export default function Home() {
                     👍 你的退休收入已经达到目标。
                   </div>
                 )}
+              </div>
+
+              {/* 3) 为什么会差这么多 ———— Misperception Fix */}
+              <div className="rounded-xl bg-white border border-[#EEE] p-5">
+                <h3 className="text-[15px] font-semibold text-[#111] mb-2">
+                  为什么会有这么大的差距？
+                </h3>
+                <div className="rounded-xl text-[13px] text-[#444] leading-relaxed">
+                  退休金之所以不够，是因为我们想象中的收入曲线和养老金的积累方式并不一致。职场中工资增长快，消费水平也不断提高，但社保养老金属于基础保障，个人账户和企业年金的积累速度都比较慢。再加上大多数年轻人低估了退休后的生活成本，自然会形成一段让人意外的差距。
+                </div>
               </div>
 
               {/* 5) 早 vs 晚 + 稳健 vs 组合 ———— Behavior + Product Insight */}

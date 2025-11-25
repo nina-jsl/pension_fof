@@ -1,6 +1,6 @@
 "use client";
 
-export default function NextStepGuide() {
+export default function NextStepGuide({setView}) {
   const steps = [
     {
       title: "选择开户银行 / 平台",

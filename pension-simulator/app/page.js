@@ -581,7 +581,7 @@ export default function Home() {
                     { label: "40岁", value: payout40 },
                     { label: "50岁", value: payout50 },
                   ]}
-                />              
+                />
 
                 <p className="mt-2 text-[12px] text-[#999] leading-relaxed">
                   越早开始，复利作用越强。相比 30 岁启动，50
@@ -604,7 +604,9 @@ export default function Home() {
                   </p>
 
                   <button
-                    onClick={() => setView("input")}
+                    onClick={() => {
+                      window.location.href = "https://www.cifm.com/";
+                    }}
                     className="mt-4 rounded-full px-5 py-2 text-[14px] font-semibold text-white bg-[#0092f9]
                     ] shadow hover:opacity-95"
                   >

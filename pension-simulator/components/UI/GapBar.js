@@ -30,9 +30,6 @@ export default function GapBar({ current = 0, target = 0, mode = "amount" }) {
           animate={{ width: `${pct * 100}%` }}
           transition={{ duration: 0.6 }}
         />
-        <div className="absolute inset-0 flex items-center justify-center text-[11px] text-white font-medium pointer-events-none">
-          {centerLabel}
-        </div>
         <AnimatePresence>
           {hover && (
             <motion.div

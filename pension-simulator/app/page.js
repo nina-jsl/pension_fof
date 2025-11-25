@@ -606,9 +606,9 @@ export default function Home() {
                   <strong> {Math.round((early50 / early30) * 100)}%</strong>。
                 </p>
               </div>
-              <TaxBenefitChart userRate={taxRate} />
+              <TaxBenefitChart monthlyWage={monthlyWage}/>
 
-              <NextStepGuide />
+              <NextStepGuide setView={setView} />
 
               {/* 7) 收尾文案 */}
               <p className="text-center text-[12px] text-[#999] mt-6">

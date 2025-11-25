@@ -1,7 +1,7 @@
 "use client";
 
-export default function TaxBenefitChart({ taxBracket }) {
-  // ---------------------- Tax Table Inline ----------------------
+export default function TaxBenefitChart({ monthlyWage}) {
+  // ---------------------- Tax Table ----------------------
   const TAX_TABLE = [
     {
       min: 0,
@@ -61,7 +61,15 @@ export default function TaxBenefitChart({ taxBracket }) {
     },
   ];
 
-  const userBracket = Number(taxBracket) || 20;
+  // ---------------------- Determine User Bracket ----------------------
+  const yearlyIncome = Number(monthlyWage) * 12 || 0;
+
+  // find the bracket whose [min, max) covers yearly income
+  const bracketRow =
+    TAX_TABLE.find((r) => yearlyIncome >= r.min && yearlyIncome < r.max) ||
+    TAX_TABLE[2]; // default around 20%
+
+  const userBracket = bracketRow.bracket;
 
   // ---------------------- Component UI ----------------------
   return (
@@ -71,10 +79,10 @@ export default function TaxBenefitChart({ taxBracket }) {
       </h3>
 
       <p className="text-[12px] text-[#666] leading-relaxed mb-3">
-        你每年可以将 <strong>¥12,000</strong> 计入个人养老金账户并享受
+        每年最多 <strong>¥12,000</strong> 可计入个人养老金账户并享受
         <strong>税前扣除</strong>。
-        <br/>
-        根据你预计所在税率档位，长期累计节税效果如下：
+        <br />
+        根据你的税率档，你的长期节税效果如下：
       </p>
 
       <div className="border border-[#EEE] rounded-xl overflow-hidden">
@@ -113,7 +121,7 @@ export default function TaxBenefitChart({ taxBracket }) {
       </div>
 
       <p className="text-[12px] text-[#999] mt-3 leading-relaxed">
-        数据源：华安基金示例。结论：即使每年节税金额不大，长期坚持也能累计数万元。
+        数据来源：华安基金示例。小额税优在长期复利作用下依然能累计可观金额。
       </p>
     </div>
   );

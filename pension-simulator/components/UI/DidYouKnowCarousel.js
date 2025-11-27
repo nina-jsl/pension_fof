@@ -43,9 +43,9 @@ export default function DidYouKnowCarousel({ items = [] }) {
         transition={{ duration: 0.28 }}
         className="mt-2 text-[13px] leading-relaxed text-[#444]"
       >
-        <p className="font-medium">{it.title}</p>
+        {/* <p className="font-medium">{it.title}</p> */}
         <p className="mt-1">{it.text}</p>
-        {it.source && (
+        {/* {it.source && (
           <a
             className="mt-2 inline-block text-xs text-[#999] underline underline-offset-4"
             href={it.source}
@@ -54,7 +54,7 @@ export default function DidYouKnowCarousel({ items = [] }) {
           >
             数据来源
           </a>
-        )}
+        )} */}
       </motion.div>
     </div>
   );

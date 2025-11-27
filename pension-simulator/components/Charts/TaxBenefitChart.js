@@ -1,6 +1,8 @@
 "use client";
 
-export default function TaxBenefitChart({ monthlyWage}) {
+import TooltipModal from "../UI/TooltipModal";
+
+export default function TaxBenefitChart({ monthlyWage }) {
   // ---------------------- Tax Table ----------------------
   const TAX_TABLE = [
     {
@@ -79,8 +81,10 @@ export default function TaxBenefitChart({ monthlyWage}) {
       </h3>
 
       <p className="text-[12px] text-[#666] leading-relaxed mb-3">
-        每年最多 <strong>¥12,000</strong> 可计入个人养老金账户并享受
-        <strong>税前扣除</strong>。
+        个人养老金账户每年最多 <strong>12,000 元</strong> 纳入税前扣除，
+        等于你每月为退休多存钱的同时，还能少交一部分税。
+        同样的钱，放在合规的个人养老金账户里，比简单存活期更划算。
+        <br />
         <br />
         根据你的税率档，你的长期节税效果如下：
       </p>
@@ -121,7 +125,7 @@ export default function TaxBenefitChart({ monthlyWage}) {
       </div>
 
       <p className="text-[12px] text-[#999] mt-3 leading-relaxed">
-        数据来源：华安基金示例。小额税优在长期复利作用下依然能累计可观金额。
+        小额税优在长期复利作用下依然能累计可观金额<TooltipModal type="tax" />
       </p>
     </div>
   );

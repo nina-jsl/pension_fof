@@ -242,18 +242,60 @@ export default function Home() {
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="text-[13px] text-[#666] mt-3 leading-relaxed bg-[#FAFAFA] p-4 rounded-xl border border-[#EEE] text-left"
+                    className="text-[13px] text-[#666] mt-3 leading-relaxed bg-[#FAFAFA] p-4 rounded-xl border border-[#EEE] text-left whitespace-pre-wrap"
                   >
                     <p>
-                      我们按世界银行建议，退休后维持退休前约{" "}
-                      <strong>{targetReplacement}%</strong>{" "}
-                      的收入替代率。中国养老金由三大支柱构成：
-                      <strong> 第一支柱（社保）</strong>、
-                      <strong> 第二支柱（企业/职业年金）</strong>、
-                      <strong> 第三支柱（个人养老金）</strong>。
+                      为了估算你退休后每月可以领到的钱，我们按以下方式计算退休收入。
                     </p>
-                    <p className="mt-2 text-[12px] text-[#999]">
-                      注：本工具以“今天购买力”口径演示，旨在直观、保守地说明缺口与补齐方案。
+
+                    <p className="mt-3">
+                      <strong>第一步：设定退休目标</strong>
+                      {"\n"}目标退休收入 = 退休前工资 × {targetReplacement}
+                      %（世界银行建议）
+                    </p>
+
+                    <p className="mt-3">
+                      <strong>第二步：计算你未来的退休工资（名义）</strong>
+                      {"\n"}未来工资 = 当前工资 × (1 + 工资增速)^(距离退休年数)
+                    </p>
+
+                    <p className="mt-3">
+                      <strong>第三步：计算第一支柱（社保）</strong>
+                      {"\n"}第一支柱包含两部分：
+                      {"\n"}1) 基础养老金（统筹）：
+                      {"\n"} 基础养老金 = ((缴费指数 × 社平工资 + 社平工资) / 2)
+                      × 缴费年限 × 1%
+                      {"\n"}2) 个人账户养老金：
+                      {"\n"} 我们按 8% 缴费，过去年份按工资反推（~1.5%），
+                      {"\n"} 并按计息率 2% 累积至退休，形成账户余额。
+                    </p>
+
+                    <p className="mt-2">
+                      <strong>个人账户养老金的发放公式</strong>
+                      {"\n"}月领金额 = 个人账户余额 ÷ 计发月数
+                      {"\n"}例如：60 岁退休常用 139，55 岁约 170（越早退休越大）
+                    </p>
+
+                    <p className="mt-3">
+                      <strong>第四步：计算第二支柱（企业年金）</strong>
+                      {"\n"}我们按你所在单位的年金水平（3% / 6% /
+                      10%）做类似累积，
+                      {"\n"}也按计发月数折算成每月可领金额。
+                    </p>
+
+                    <p className="mt-3">
+                      <strong>第五步：将所有金额折算回“今天购买力”</strong>
+                      {"\n"}每月退休金（真实） = 每月退休金（名义） ÷ (1 +
+                      通胀率)^(距离退休年数)
+                    </p>
+
+                    <p className="mt-3">
+                      <strong>最终：预计退休每月可领取金额</strong>
+                      {"\n"}= 第一支柱（基础 + 个人账户） + 第二支柱（企业年金）
+                    </p>
+
+                    <p className="mt-3 text-[12px] text-[#999]">
+                      注：本工具以“今天购买力”口径展示，以便更直观理解未来的实际生活水平。
                     </p>
                   </motion.div>
                 )}
@@ -453,27 +495,23 @@ export default function Home() {
                   className="absolute -top-2 left-4 bg-[#0092f9]/5 text-[#0092f9] 
        text-[11px] px-2 py-0.5 rounded-full font-medium shadow"
                 >
-                  提醒
+                  小贴士
                 </div>
 
-                <p className="text-[14px] font-semibold text-[#1A2B4A] leading-relaxed pt-2">
-                  很多人以为“退休的事以后再说”，或觉得“有社保就够了”。
+                <p className="text-[13px]  text-[#3B4D6A] leading-relaxed pt-2">
+                  很多人对未来养老金的“心理预期”与最终实际能领到的数额，会存在明显差距。
+                  提前了解自己的情况，是规划退休生活最关键的一步。
                 </p>
 
                 <p className="mt-2 text-[13px] text-[#3B4D6A] leading-relaxed">
-                  但真正决定你未来生活质量的，是你以为能领到的金额，
-                  和你实际能领到的金额之间的差距。
-                </p>
-
-                <p className="mt-2 text-[13px] text-[#3B4D6A] leading-relaxed">
-                  我们先根据你的情况快速测算，看看你60岁时的“真实数字”是多少。
+                  下面我们先根据你的情况快速测算，看看你60岁时每个月可以领取多少钱。
                 </p>
               </div>
 
               {/* 2) 实际 vs 目标 ———— Real Shock Card */}
               <div className="rounded-2xl bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
                 <h2 className="text-[15px] font-semibold text-[#111] mb-3">
-                  你的真实退休收入（按今天购买力）
+                  预计退休月收入对比
                 </h2>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -483,25 +521,28 @@ export default function Home() {
                       ¥{Math.round(result.p1.total + result.p2.monthly)}
                       <span className="text-[14px] font-semibold">/ 月</span>
                     </p>
-                    <p className="mt-1 text-[12px] text-[#9B9B9B]">
-                      (第一支柱 + 第二支柱)
+                    <div className="flex items-center gap-1 mt-1 text-[12px] text-[#9B9B9B]">
+                      <span>(第一支柱 + 第二支柱)</span>
                       <TooltipModal type="pillar1n2" />
-                    </p>
+                    </div>
                   </div>
 
                   <div className="rounded-xl bg-[#FAFAFA] p-4">
                     <p className="text-[12px] text-[#8B8B8B]">
-                      目标({Number(targetReplacement)}% 收入替代率)
-                      <TooltipModal type="replacement" />
+                      你理想的退休月收入
                     </p>
                     <p className="mt-1 text-[28px] leading-none font-extrabold text-[#222]">
                       ¥{Math.round(result.p3.targetReal)}
                       <span className="text-[14px] font-semibold">/ 月</span>
                     </p>
-                    <p className="mt-1 text-[12px] text-[#9B9B9B]">
-                      按今天购买力
-                    </p>
+                    <div className="flex items-center gap-1 mt-1 text-[12px] text-[#9B9B9B]">
+                      <span>(第一支柱 + 第二支柱)</span>
+                      <TooltipModal type="replacement" />
+                    </div>
                   </div>
+                  <p className="text-[10px] text-[#9B9B9B]">
+                    *所有金额均以今天购买力计算
+                  </p>
                 </div>
 
                 <div className="mt-4">
@@ -516,7 +557,7 @@ export default function Home() {
               {/* 4) 第三支柱缺口 ———— Core Gap Section */}
               <div className="rounded-2xl bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
                 <h2 className="text-[15px] font-semibold text-[#111]">
-                  你的第三支柱缺口
+                  为补齐这段差距，你的第三支柱还差多少?
                   <TooltipModal type="pillar3" />
                 </h2>
 
@@ -533,21 +574,22 @@ export default function Home() {
                     </div>
 
                     <div className="mt-3">
-                      <p className="text-[12px] text-[#21292e]">
-                        若现在开始，应每月储蓄
-                      </p>
+                      <div className="flex items-center gap-1 mt-1 text-[12px] text-[#21292e]">
+                        <span>若现在开始，应每月储蓄</span>
+                        <TooltipModal type="monthlySaving" />
+                      </div>
                       <p className="text-[22px] font-bold text-[#0092f9]">
                         ¥{Math.round(result.p3.monthlySaving)}
                         <span className="text-[13px] font-semibold">/ 月</span>
                       </p>
                     </div>
 
-                    <p className="mt-2 text-[12px] text-[#00458a]">
+                    {/* <p className="mt-2 text-[12px] text-[#00458a]">
                       再晚一年开始，你需要的年储蓄将增加明显。
-                    </p>
+                    </p> */}
                   </>
                 ) : (
-                  <div className="mt-3 rounded-xl bg-[#EEFFF6] p-4 text-[#1B7A55] text-[13px]">
+                  <div className="mt-3 rounded-xl bg-[#EEFFF6] p-4 text-[#00a16d] text-[13px]">
                     👍 你的退休收入已经达到目标。
                   </div>
                 )}
@@ -559,14 +601,24 @@ export default function Home() {
                   为什么会有这么大的差距？
                 </h3>
                 <div className="rounded-xl text-[13px] text-[#444] leading-relaxed">
-                  退休金之所以不够，是因为我们想象中的收入曲线和养老金的积累方式并不一致。职场中工资增长快，消费水平也不断提高，但社保养老金属于基础保障，个人账户和企业年金的积累速度都比较慢。再加上大多数年轻人低估了退休后的生活成本，自然会形成一段让人意外的差距。
+                  从制度设计上看，第一支柱本身就是“基础保障”，
+                  并不是为了一个人独自撑起 70% 的替代率。
+                  国际经验一般认为，三支柱合在一起，才能大致达到70%左右。
+                  目前我国第一支柱大约只能提供44%，
+                  企业年金覆盖率又偏低、发展较慢，自然会留下一个约26%的空缺，需要由个人养老金和长期投资来补齐。
+                </div>
+                <div className="mt-2 text-[13px] text-[#444] leading-relaxed">
+                  从个人角度看，收入通常随着职业发展持续上涨，
+                  生活水准也在抬高；但社保账户和企业年金的积累相对滞后，
+                  很多人还低估了退休后的医疗、照护等支出。
+                  结果就是：以为“有社保就够了”，真正算出来才发现差得不少。
                 </div>
               </div>
 
               {/* 5) 早 vs 晚 + 稳健 vs 组合 ———— Behavior + Product Insight */}
               <div className="rounded-2xl bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
-                <h3 className="text-[15px] font-semibold text-[#111] mb-4">
-                  为什么“越早开始越轻松”？
+                <h3 className="text-[15px] font-semibold text-[#111] mb-2">
+                  这段缺口要怎么补？越早开始，越轻松补上
                 </h3>
 
                 <p className="text-[12px] text-[#999] mb-2">
@@ -606,7 +658,7 @@ export default function Home() {
                   <strong> {Math.round((early50 / early30) * 100)}%</strong>。
                 </p>
               </div>
-              <TaxBenefitChart monthlyWage={monthlyWage}/>
+              <TaxBenefitChart monthlyWage={monthlyWage} />
 
               <NextStepGuide setView={setView} />
 

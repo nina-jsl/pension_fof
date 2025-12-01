@@ -142,6 +142,33 @@ export default function Home() {
     setView("result");
   }
 
+  function computeRequiredMonthlySaving(
+    targetPayout, // 这里传 gap（今天价格）
+    yearsLeft, // 距离退休还有多少年
+    realReturn, // 不同产品的真实年化收益率
+    annuityDivisor // 计发月数
+  ) {
+    let low = 0;
+    let high = 20000; // 上界给大一点
+
+    for (let i = 0; i < 40; i++) {
+      const mid = (low + high) / 2;
+      const payout = projectMonthlyPayout({
+        monthlySaving: mid,
+        yearsToRetire: yearsLeft,
+        realReturn,
+        annuityDivisor,
+      });
+
+      if (payout >= targetPayout) {
+        high = mid;
+      } else {
+        low = mid;
+      }
+    }
+    return high;
+  }
+
   const DEMO_CONTRIBUTION = 1000; // 每月示例储蓄金额
 
   let early30 = 0;
@@ -150,6 +177,9 @@ export default function Home() {
   let rate25 = 0;
   let rate35 = 0;
   let rate6 = 0;
+  let saving25 = 0;
+  let saving35 = 0;
+  let saving55 = 0;
 
   if (view === "result" && result) {
     // 当前用户年龄与退休年龄
@@ -198,6 +228,29 @@ export default function Home() {
       realReturn: 0.06,
       annuityDivisor,
     });
+
+    const gap = result.p3.gap;
+    const yearsLeftLocal = Math.max(0, retirementAge - Number(age));
+
+    // Required monthly savings for each product category
+    saving25 = computeRequiredMonthlySaving(
+      gap,
+      yearsLeftLocal,
+      0.025,
+      annuityDivisor
+    );
+    saving35 = computeRequiredMonthlySaving(
+      gap,
+      yearsLeftLocal,
+      0.035,
+      annuityDivisor
+    );
+    saving55 = computeRequiredMonthlySaving(
+      gap,
+      yearsLeftLocal,
+      0.055,
+      annuityDivisor
+    );
   }
 
   return (
@@ -274,8 +327,9 @@ export default function Home() {
                       {"\n"} 基础养老金 = ((缴费指数 × 社平工资 + 社平工资) / 2)
                       × 缴费年限 × 1%
                       {"\n"}2) 个人账户养老金：
-                      {"\n"} 我们按 8% 缴费，过去年份按工资反推（~1.5%），
-                      {"\n"} 并按计息率 2% 累积至退休，形成账户余额。
+                      {"\n"} 我们按 8% 缴费，过去年份按工资反推(~1.5%)
+                      <TooltipModal type="backcast" />，{"\n"} 并按计息率 2%
+                      累积至退休，形成账户余额。
                     </p>
 
                     <p className="mt-2">
@@ -464,16 +518,6 @@ export default function Home() {
                       70%为世界银行建议标准，可上调以追求更高品质生活。
                     </p>
                   </div>
-
-                  {/* <div className="flex justify-between items-center px-3 py-3">
-                    <span className="text-sm text-[#333]">边际税率(%)</span>
-                    <input
-                      type="number"
-                      className="text-right w-16 text-sm outline-none"
-                      value={taxRate}
-                      onChange={(e) => setTaxRate(Number(e.target.value))}
-                    />
-                  </div> */}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -565,36 +609,78 @@ export default function Home() {
               {/* 4) 第三支柱缺口 ———— Core Gap Section */}
               <div className="rounded-2xl bg-white shadow-[0_2px_20px_rgba(0,0,0,0.04)] p-5">
                 <h2 className="text-[15px] font-semibold text-[#111]">
-                  为补齐这段差距，你的第三支柱还差多少?
-                  <TooltipModal type="pillar3" />
+                  为达到目标水平，你需要储蓄多少？
                 </h2>
 
                 {result.p3.gap > 0 ? (
                   <>
+                    {/* 缺口金额 */}
                     <div className="mt-3">
                       <p className="text-[12px] text-[#21292e]">
-                        退休后每月还差
+                        按今天购买力算，你距离目标每月还差大约：
                       </p>
-                      <p className="text-[26px] font-bold text-[#0092f9] leading-tight">
+                      <p className="mt-1 text-[26px] font-bold text-[#0092f9] leading-tight">
                         ¥{Math.round(result.p3.gap)}
-                        <span className="text-[13px] font-semibold">/ 月</span>
+                        <span className="text-[13px] font-semibold"> / 月</span>
                       </p>
                     </div>
 
-                    <div className="mt-3">
-                      <div className="flex items-center gap-1 mt-1 text-[12px] text-[#21292e]">
-                        <span>若现在开始，应每月储蓄</span>
-                        <TooltipModal type="monthlySaving" />
+                    {/* 引出“从现在开始要存多少” */}
+                    <p className="mt-3 text-[12px] text-[#666]">
+                      如果从现在开始每月固定存一笔钱，不同方式大概需要存
+                    </p>
+
+                    {/* Comparison Table */}
+                    <div className="mt-2 space-y-3">
+                      {/* 定存 / 2–3% */}
+                      <div className="flex items-center justify-between bg-[#FAFAFA] px-4 py-2.5 rounded-xl">
+                        <p className="text-[13px] text-[#555]">
+                          养老储蓄 / 定存（2-3%）
+                        </p>
+
+                        <div className="text-[15px] font-semibold text-[#222]">
+                          ¥{Math.round(saving25)} / 月
+                        </div>
                       </div>
-                      <p className="text-[22px] font-bold text-[#0092f9]">
-                        ¥{Math.round(result.p3.monthlySaving)}
-                        <span className="text-[13px] font-semibold">/ 月</span>
-                      </p>
+
+                      {/* 养老理财 */}
+                      <div className="flex items-center justify-between bg-[#FAFAFA] px-4 py-2.5 rounded-xl">
+                        <p className="text-[13px] text-[#555]">
+                          养老理财（3.5%）
+                        </p>
+                        <div className="text-[15px] font-semibold text-[#222]">
+                          ¥{Math.round(saving35)} / 月
+                        </div>
+                      </div>
+
+                      {/* 养老FOF（推荐） */}
+                      <div className="relative flex items-center justify-between bg-[#FFE7A3]/25 border border-[#ffbe37] px-4 py-2.5 rounded-xl">
+                        <p className="text-[13px] text-[#a76a00]">
+                          养老 FOF 多资产方案 (5-6%)
+                        </p>
+                        {/* Badge */}
+                        <span
+                          className="absolute -top-3 right-0 bg-[#ffbe37] text-white 
+              text-[10px] px-2 py-0.5 rounded-full font-semibold shadow"
+                        >
+                          推荐
+                        </span>
+
+                        <div className="text-[15px] font-semibold text-[#a76a00]">
+                          ¥{Math.round(saving55)} / 月
+                        </div>
+                      </div>
                     </div>
 
-                    {/* <p className="mt-2 text-[12px] text-[#00458a]">
-                      再晚一年开始，你需要的年储蓄将增加明显。
-                    </p> */}
+                    {/* Summary Text */}
+                    <p className="mt-3 text-[12px] text-[#999] leading-relaxed">
+                      同样的退休目标下，长期收益率更高，就能少存一点。养老 FOF
+                      让你每月更轻松，把更多预算留给生活、孩子，或你真正想做的事。
+                    </p>
+
+                    <p className="mt-1 text-[10px] text-[#C0C0C0]">
+                      *以上为测算示例，不构成收益承诺或投资建议。
+                    </p>
                   </>
                 ) : (
                   <div className="mt-3 rounded-xl bg-[#EEFFF6] p-4 text-[#00a16d] text-[13px]">

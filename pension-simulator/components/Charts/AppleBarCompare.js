@@ -9,7 +9,7 @@ export default function AppleBarCompare({ items }) {
   const gradients = [
     { from: "#bb99ff", to: "#6f44bb" },   // 紫
     { from: "#70c4ff", to: "#0092f9" },   // 蓝
-    { from: "#ffb86b", to: "#ff7b00" },   // 橙（推荐）
+    { from: "#FFE7A3", to: "#ffbe37" },   // 黄（推荐）
   ];
 
   return (
@@ -33,7 +33,7 @@ export default function AppleBarCompare({ items }) {
                 initial={{ scale: 0.6, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="absolute -top-3 right-0 bg-[#ff7b00] text-white 
+                className="absolute -top-3 right-0 bg-[#ffbe37] text-white 
                            text-[10px] px-2 py-0.5 rounded-full font-semibold shadow"
               >
                 推荐

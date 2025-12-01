@@ -1,45 +1,45 @@
 'use client'
 import React from 'react'
 
-export default function AppleBarCompare({ leftLabel, rightLabel, leftValue, rightValue }) {
-  const maxVal = Math.max(leftValue, rightValue, 1);
-  const leftPct = (leftValue / maxVal) * 100;
-  const rightPct = (rightValue / maxVal) * 100;
+export default function AppleBarCompare({ items }) {
+  // items: [{ label, value, colorFrom, colorTo }]
+  const maxVal = Math.max(...items.map(i => i.value), 1);
 
   return (
     <div className="space-y-3">
-      {/* Row 1 */}
-      <div>
-        <div className="flex justify-between mb-1">
-          <span className="text-[13px] text-[#666]">{leftLabel}</span>
-          <span className="text-[13px] font-medium text-[#222]">
-            ¥{Math.round(leftValue)} / 月
-          </span>
-        </div>
-        <div className="h-2.5 rounded-full bg-[#F2F2F2] overflow-hidden">
-          <div
-            className="h-full rounded-full bg-linear-to-r from-[#bb99ff] to-[#6f44bb]"
-            style={{ width: `${leftPct}%` }}
-          />
-        </div>
-      </div>
+      {items.map((item, idx) => {
+        const pct = (item.value / maxVal) * 100;
 
-      {/* Row 2 */}
-      <div>
-        <div className="flex justify-between mb-1">
-          <span className="text-[13px] text-[#666]">{rightLabel}</span>
-          <span className="text-[13px] font-medium text-[#0092f9]">
-            ¥{Math.round(rightValue)} / 月
-          </span>
-        </div>
-        <div className="h-2.5 rounded-full bg-[#F2F2F2] overflow-hidden">
-          <div
-            className="h-full rounded-full bg-linear-to-r from-[#70c4ff] to-[#0092f9]"
-            style={{ width: `${rightPct}%` }}
-          />
-        </div>
-      </div>
+        // fallback colors
+        const gradients = [
+          { from: "#bb99ff", to: "#6f44bb" },   // 紫色
+          { from: "#70c4ff", to: "#0092f9" },   // 蓝色
+          { from: "#ffd27f", to: "#ff9f1c" },   // 橙色（FOF可用）
+        ];
+
+        const g = gradients[idx] || gradients[gradients.length - 1];
+
+        return (
+          <div key={idx}>
+            <div className="flex justify-between mb-1">
+              <span className="text-[13px] text-[#666]">{item.label}</span>
+              <span className="text-[13px] font-medium text-[#222]">
+                ¥{Math.round(item.value)} / 月
+              </span>
+            </div>
+
+            <div className="h-2.5 rounded-full bg-[#F2F2F2] overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${pct}%`,
+                  background: `linear-gradient(to right, ${g.from}, ${g.to})`,
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
-

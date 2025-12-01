@@ -148,6 +148,7 @@ export default function Home() {
   let early40 = 0;
   let early50 = 0;
   let rate25 = 0;
+  let rate35 = 0;
   let rate6 = 0;
 
   if (view === "result" && result) {
@@ -159,6 +160,13 @@ export default function Home() {
       monthlySaving: DEMO_CONTRIBUTION,
       yearsToRetire: yearsLeft,
       realReturn: 0.025,
+      annuityDivisor,
+    });
+
+    rate35 = projectMonthlyPayout({
+      monthlySaving: DEMO_CONTRIBUTION,
+      yearsToRetire: yearsLeft,
+      realReturn: 0.035,
       annuityDivisor,
     });
 
@@ -628,10 +636,20 @@ export default function Home() {
 
                 {/* A. 定存 vs 投资 */}
                 <AppleBarCompare
-                  leftLabel="定存（约 2.5%）"
-                  rightLabel="投资组合（约 6%）"
-                  leftValue={rate25}
-                  rightValue={rate6}
+                  items={[
+                    {
+                      label: "养老储蓄 / 定存（2–3%）",
+                      value: rate25,
+                    },
+                    {
+                      label: "养老理财（3.5%）",
+                      value: rate35,
+                    },
+                    {
+                      label: "养老FOF 多资产方案（推荐）（5-6%）",
+                      value: rate6,
+                    },
+                  ]}
                 />
 
                 <p className="mt-2 text-[12px] text-[#999]">

@@ -646,7 +646,7 @@ export default function Home() {
                       value: rate35,
                     },
                     {
-                      label: "养老FOF 多资产方案（推荐）（5-6%）",
+                      label: "养老FOF 多资产方案（5-6%）",
                       value: rate6,
                     },
                   ]}
